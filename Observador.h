@@ -1,13 +1,8 @@
-#ifndef SIMULACION_H
-#define SIMULACION_H
+#ifndef OBSERVADOR_H
+#define OBSERVADOR_H
 
 // includes de la aplicación
 #include "ns3/header.h"
-#include "ns3/ppp-header.h"
-#include "ns3/core-module.h"
-#include "ns3/network-module.h"
-#include "ns3/application.h"
-#include "ns3/stats-module.h"
 #include "ns3/core-module.h"
 #include "ns3/object.h"
 #include "ns3/global-value.h"
@@ -35,6 +30,7 @@
 #include "ns3/traffic-control-layer.h"
 #include "ns3/traffic-control-helper.h"
 #include "ns3/inet-socket-address.h"
+#include "ns3/ppp-header.h"
 #include <ns3/gnuplot.h>
 #include <ns3/queue.h>
 #include <ostream>
@@ -42,6 +38,29 @@
 
 using namespace ns3;
 
-// observador
+struct ParametrosObservador {
 
-#endif
+	Ptr<ApplicationContainer> camaras;
+	Ptr<ApplicationContainer> usuarios;
+	Ptr<ApplicationContainer> servidores;
+
+	Ptr<PointToPointNetDevice> enlaceRoutersIzq;
+	Ptr<PointToPointNetDevice> enlaceRoutersDer;
+
+};
+
+class Observador : public Object {
+
+	public:
+	Observador (ParametrosObservador); // constructor
+	// funciones get
+
+	private:
+	Ptr<ApplicationContainer> camaras;
+	Ptr<ApplicationContainer> usuarios;
+	Ptr<ApplicationContainer> servidores;
+
+	Ptr<PointToPointNetDevice> enlaceRoutersIzq;
+	Ptr<PointToPointNetDevice> enlaceRoutersDer;
+
+}
