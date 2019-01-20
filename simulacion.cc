@@ -68,16 +68,19 @@ NS_LOG_COMPONENT_DEFINE ("simulacion");
 // parámetros de la transmisión de video
 #define MIN_START_VIDEO     "0s"
 #define MAX_START_VIDEO     "7h" // 3 robos por semana -> 3/7 = 0.42 -> 1 robo cada 3h/0.42=7h
-#define MEAN_DRTN_VIDEO     "15m"
+#define MEAN_DRTN_VIDEO     "15min"
 
-//definiciones generales
-#define NUM_USUARIOS 3000 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
-#define NUM_SERVIDORES 4
-#define ENLACES_TRONCALES 2
-#define NUM_NODOS_ENLACE 2 //numero de nodos por enlace
-//indices para la tablas
-#define ROUTER 0
-#define NODO_FINAL 1
+// definiciones generales
+#define NUM_USUARIOS        3000 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
+#define NUM_SERVIDORES      4
+#define CLI_PREMIUM         0.2
+#define ENLACES_TRONCALES   2
+#define NUM_NODOS_ENLACE    2 //numero de nodos por enlace
+// indices para la tablas
+#define G1_G3       0
+#define G1_G4       1
+#define ROUTER      0
+#define NODO_FINAL  1
 
 /************** Definición de tipos ***************/
 
@@ -98,12 +101,14 @@ typedef struct {
 // Estructura para los parametros del escenario
 typedef struct {
   LinkP2P serverLink;
-  LinkP2P routersLink;
+  LinkP2P routerLink;
   LinkP2P camLink;
   LinkP2P userLink;
   VideoApp alarmVideo;
   uint32_t numServers;
   uint32_t numUsers;
+  double cliPremium; // proporción clientes premium
+  double cliBest;    // proporción clientes best-effort
 } ParamsEscenario;
 
 
@@ -137,11 +142,11 @@ int main (int argc, char *argv[]) {
   Time routerDelay (ROUTER_DELAY);
   double routerPerror = P_ERROR;
   // - grupo de enlaces 3
-  LinkP2P camLink
+  LinkP2P camLink;
   DataRate camRate (CAM_RATE);
   Time camDelay (CAM_DELAY);
   // - grupo de enlaces 4
-  LinkP2P userLink
+  LinkP2P userLink;
   DataRate userRate (USER_RATE);
   Time userDelay (USER_DELAY);
 
@@ -155,8 +160,10 @@ int main (int argc, char *argv[]) {
 
 
   /** Parámetros de la simulación **/
+
   uint32_t numServers = NUM_SERVIDORES;
   uint32_t numUsers = NUM_USUARIOS;
+  double cliPremium = CLI_PREMIUM;
 
 
   /** Añadimos los parametros configurables por linea de comando **/
@@ -166,14 +173,16 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("tasaRouters", "Capacidad de los enlaces entre routers", routerRate);
   cmd.AddValue ("tasaCamaras", "Capacidad de los enlaces a las camaras", camRate);
   cmd.AddValue ("tasaUsuarios", "Capacidad de los enlaces a los usuarios", userRate);
-  cmd.AddValue ("perror", "Probabilidad de error de paquete de los enlaces", perror);
+  cmd.AddValue ("perror", "Probabilidad de error de paquete de los enlaces entre routers", routerPerror);
   cmd.AddValue ("minStartVideo", "Tiempo mínimo de comienzo de transmisión de video", minStartVideo);
   cmd.AddValue ("maxStartVideo", "Tiempo máximo de comienzo de transmisión de video", maxStartVideo);
   cmd.AddValue ("duracionVideo", "Duración media de la transmisión de video", meanDrtnVideo);
   cmd.AddValue ("numServidores", "Número de servidores", numServers);
   cmd.AddValue ("numUsuarios", "Número de usuarios", numUsers);
+  cmd.AddValue ("clientesPremium", "Número de servidores", cliPremium);
   cmd.Parse (argc, argv);
 
+  double cliBest = 1 - cliPremium;
 
   /** Añadimos parámetros al escenario **/
   serverLink.rate = serverRate;
@@ -201,6 +210,8 @@ int main (int argc, char *argv[]) {
   paramsEscenario.alarmVideo = alarmVideo;
   paramsEscenario.numServers = numServers;
   paramsEscenario.numUsers = numUsers;
+  paramsEscenario.cliPremium = cliPremium;
+  paramsEscenario.cliBest = cliBest;
 
   escenario(paramsEscenario);
 
@@ -231,7 +242,7 @@ void escenario(ParamsEscenario paramsEscenario){
     grupoUno[enlace].Create(NODO_FINAL);
   }
   // Enlaces grupo tres (cámaras) y cuatro (usuarios)
-  for (uint32_t enlace = 0; i < paramsEscenario.numUsers; enlace++) {
+  for (uint32_t enlace = 0; enlace < paramsEscenario.numUsers; enlace++) {
     grupoTres[enlace].Add(grupoDos[G1_G3].Get(1));
     grupoTres[enlace].Create(NODO_FINAL);
     grupoCuatro[enlace].Add(grupoDos[G1_G4].Get(1));
@@ -263,91 +274,112 @@ void escenario(ParamsEscenario paramsEscenario){
   remRouter->SetRate (paramsEscenario.routerLink.perror);
   enlaceRouters.SetDeviceAttribute("ReceiveErrorModel", PointerValue(remRouter));
 
-  //creamos un tabla para los NetDeviceContainer
+  // Creamos un tabla para los NetDeviceContainer
   NetDeviceContainer devicesGrupo1 [paramsEscenario.numServers];
-  for (uint32_t n_nodo = 0; i < paramsEscenario.numServers; i++) {
+  for (uint32_t n_nodo = 0; n_nodo < paramsEscenario.numServers; n_nodo++) {
     devicesGrupo1[n_nodo] = enlaceServidores.Install(grupoUno[n_nodo]);
   }
   NetDeviceContainer devicesGrupo2 [ENLACES_TRONCALES];
-  for (uint32_t n_nodo = 0; i < ENLACES_TRONCALES; i++) {
+  for (uint32_t n_nodo = 0; n_nodo < ENLACES_TRONCALES; n_nodo++) {
     devicesGrupo2[n_nodo] = enlaceRouters.Install(grupoDos[n_nodo]);
   }
   NetDeviceContainer devicesGrupo3 [paramsEscenario.numUsers];
   NetDeviceContainer devicesGrupo4 [paramsEscenario.numUsers];
-  for (uint32_t n_nodo = 0; i < paramsEscenario.numUsers; i++) {
+  for (uint32_t n_nodo = 0; n_nodo < paramsEscenario.numUsers; n_nodo++) {
     devicesGrupo3[n_nodo] = enlaceCamaras.Install(grupoTres[n_nodo]);
     devicesGrupo4[n_nodo] = enlaceUsuarios.Install(grupoCuatro[n_nodo]);
   }
 
-  // Instalamos la pila TCP/IP en todos los nodos
+  /** Configuración IP **/
+  // Instalamos la pila TCP/IP en todos los nodos finales
   InternetStackHelper stack;
   for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numServers; n_nodo++){
-    stack.Install (grupoUno[n_nodo]);
+    stack.Install(grupoUno[n_nodo].Get(NODO_FINAL)); // instalamos en nodo final
   }
   for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numUsers; n_nodo++){
-    stack.Install (grupoTres[n_nodo]);
-    stack.Install (grupoCuatro[n_nodo]);
+    stack.Install(grupoTres[n_nodo].Get(NODO_FINAL)); // instalamos en nodo final
+    stack.Install(grupoCuatro[n_nodo].Get(NODO_FINAL)); // instalamos en nodo final
   }
+  // Instalamos en los routers
+  stack.Install(grupoDos[G1_G3].Get(0));
+  stack.Install(grupoDos[G1_G3].Get(1));
+  stack.Install(grupoDos[G1_G4].Get(1));
 
-  //asignamos direcciones al grupo1
+  // Asignamos direcciones IP al grupo1
   Ipv4AddressHelper addressesGrupo1 [paramsEscenario.numServers];
   Ipv4InterfaceContainer interfacesGrupo1 [paramsEscenario.numServers];
+  std::string dir;
+  char *dir_buff;
+  Ipv4Address ipv4Address ("0.0.0.0");
   for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numServers; n_nodo++){
-        std::string dir("10.1."+std::to_string(n_nodo+1)+".0");
-        NS_LOG_DEBUG("direccion ip enlace "<<n_nodo<<"="<<dir);
-        char *dir_buff = new char[9];//9 es el tamano que tendra la ip
-        strncpy(dir_buff, dir.c_str(), 9);
-        addressesGrupo1[n_nodo].SetBase(dir_buff, "255.255.255.0");
+        dir = ("10.1."+std::to_string(n_nodo+1)+".0");
+        NS_LOG_DEBUG("Direccion IP enlace "<<n_nodo<<" Grupo 1: "<<dir);
+        dir_buff = new char[dir.length()]; // dir.length() es el tamano que tendra la ip
+        strcpy(dir_buff, dir.c_str());
+        ipv4Address.Set(dir_buff);
+        addressesGrupo1[n_nodo].SetBase(ipv4Address, "255.255.255.0");
         interfacesGrupo1[n_nodo] = addressesGrupo1[n_nodo].Assign (devicesGrupo1[n_nodo]);
   }
-  //asignamos direcciones al grupo2
+  // Asignamos direcciones al grupo2
   Ipv4AddressHelper addressesGrupo2 [ENLACES_TRONCALES];
   Ipv4InterfaceContainer interfacesGrupo2 [ENLACES_TRONCALES];
   for(uint32_t n_nodo = 0; n_nodo < ENLACES_TRONCALES; n_nodo++){
-        std::string dir("10.2."+std::to_string(n_nodo+1)+".0");
-        NS_LOG_DEBUG("direccion ip enlace "<<n_nodo<<"="<<dir);
-        char *dir_buff = new char[9];//9 es el tamano que tendra la ip
-        strncpy(dir_buff, dir.c_str(), 9);
-        addressesGrupo2[n_nodo].SetBase(dir_buff, "255.255.255.0");
+        dir = ("10.2."+std::to_string(n_nodo+1)+".0");
+        NS_LOG_DEBUG("Direccion IP enlace "<<n_nodo<<" Grupo 2: "<<dir);
+        dir_buff = new char[dir.length()];// dir.length() es el tamano que tendra la ip
+        strcpy(dir_buff, dir.c_str());
+        ipv4Address.Set(dir_buff);
+        addressesGrupo2[n_nodo].SetBase(ipv4Address, "255.255.255.0");
         interfacesGrupo2[n_nodo] = addressesGrupo2[n_nodo].Assign (devicesGrupo2[n_nodo]);
   }
-  //asignamos direcciones al grupo3
+  // Asignamos direcciones al grupo3
   Ipv4AddressHelper addressesGrupo3 [paramsEscenario.numUsers];
   Ipv4InterfaceContainer interfacesGrupo3 [paramsEscenario.numUsers];
   Ipv4AddressHelper addressesGrupo4 [paramsEscenario.numUsers];
   Ipv4InterfaceContainer interfacesGrupo4 [paramsEscenario.numUsers];
 
   uint32_t n_nodo = 0;
-  for(uint32_t segundaPosIP = 0; segundaPosIP <= 255; segundaPosIP++){
-    for(uint32_t terceraPosIP = 0; terceraPosIP <= 255; terceraPosIP++){
-      if(n_nodo < paramsEscenario.numUsers) {
-        std::string dir("13."+std::to_string(segundaPosIP)+"."+std::to_string(terceraPosIP)+".0");
-        NS_LOG_DEBUG("direccion ip enlace "<<n_nodo<<"="<<dir);
-        char *dir_buff = new char[9];//9 es el tamano que tendra la ip
-        strncpy(dir_buff, dir.c_str(), 9);
-        addressesGrupo3[n_nodo].SetBase(dir_buff, "255.255.255.0");
-        interfacesGrupo3[n_nodo] = addressesGrupo3[n_nodo].Assign (devicesGrupo3[n_nodo]);
+  for(uint32_t segundaPosIP = 0; segundaPosIP <= 255 && n_nodo < paramsEscenario.numUsers ; segundaPosIP++){
+    for(uint32_t terceraPosIP = 0; terceraPosIP <= 255 && n_nodo < paramsEscenario.numUsers ; terceraPosIP++){
+      dir = ("13."+std::to_string(segundaPosIP)+"."+std::to_string(terceraPosIP)+".0");
+      NS_LOG_DEBUG("Direccion IP enlace "<<n_nodo<<" Grupo 3: "<<dir);
+      dir_buff = new char[dir.length()];// dir.length() es el tamano que tendra la ip
+      strcpy(dir_buff, dir.c_str());
+      ipv4Address.Set(dir_buff);
+      addressesGrupo3[n_nodo].SetBase(ipv4Address, "255.255.255.0");
+      interfacesGrupo3[n_nodo] = addressesGrupo3[n_nodo].Assign (devicesGrupo3[n_nodo]);
 
-        std::string dir("14."+std::to_string(segundaPosIP)+"."+std::to_string(terceraPosIP)+".0");
-        NS_LOG_DEBUG("direccion ip enlace "<<n_nodo<<"="<<dir);
-        char *dir_buff = new char[9];//9 es el tamano que tendra la ip
-        strncpy(dir_buff, dir.c_str(), 9);
-        addressesGrupo4[n_nodo].SetBase(dir_buff, "255.255.255.0");
-        interfacesGrupo4[n_nodo] = addressesGrupo4[n_nodo].Assign (devicesGrupo4[n_nodo]);
+      dir = ("14."+std::to_string(segundaPosIP)+"."+std::to_string(terceraPosIP)+".0");
+      NS_LOG_DEBUG("Direccion IP enlace "<<n_nodo<<" Grupo 4: "<<dir);
+      dir_buff = new char[dir.length()];// dir.length() es el tamano que tendra la ip
+      strcpy(dir_buff, dir.c_str());
+      ipv4Address.Set(dir_buff);
+      addressesGrupo4[n_nodo].SetBase(ipv4Address, "255.255.255.0");
+      interfacesGrupo4[n_nodo] = addressesGrupo4[n_nodo].Assign (devicesGrupo4[n_nodo]);
 
-        //incrementamos el nodo.
-        n_nodo++;
-      }
+      // incrementamos el nodo.
+      n_nodo++;
     }
   }
-    
-  //poblamos las tablas de rutas
+
+  // Poblamos las tablas de rutas
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-  /** Configuración de las aplicaciones **/
+  /** Configuración de las colas de prioridad **/
+  // https://www.nsnam.org/docs/models/html/prio.html
+  TrafficControlHelper trafficControl;
+  // Creamos una cola de prioridad con el mapa de prioridad dado
+  uint16_t handle = trafficControl.SetRootQueueDisc ("ns3::PrioQueueDisc", "Priomap", StringValue ("0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1"));
+  // Añadimos dos clases de cola
+  TrafficControlHelper::ClassIdList classIds = trafficControl.AddQueueDiscClasses (handle, 2, "ns3::QueueDiscClass");
+  // Adjuntamos dos colas FIFO para las dos clases añadidas
+  trafficControl.AddChildQueueDisc (handle, classIds[0], "ns3::F ifoQueueDisc");
+  trafficControl.AddChildQueueDisc (handle, classIds[1], "ns3::FifoQueueDisc");
+
+  /** Configuración de las aplicaciones
   // variables aleatorias con el tiempo de comienzo y fin de la app
   Ptr<RandomVariableStream> alarmVideoStart = CreateObject<UniformRandomVariable>();
   Ptr<RandomVariableStream> alarmVideoStop = CreateObject<UniformRandomVariable>();
-  videoStart.SetAttribute("Min", DoubleValue(minStartVideo.GetDouble()))
+  videoStart.SetAttribute("Min", DoubleValue(minStartVideo.GetDouble()))**/
 }
 //La simulacion hay que pararla manualmente.
