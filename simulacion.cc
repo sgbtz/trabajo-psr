@@ -1,5 +1,6 @@
 /*************** TRABAJO PSR ***************/
 /*
+**  Simulacion de una empresa de camaras de vigilancia.
 **  Apellidos, Nombres:
 **
 **    - Cabrera Miñagorri, Miguel Ángel
@@ -20,17 +21,17 @@
 #include "ns3/random-variable-stream.h"
 #include "ns3/traffic-control-helper.h"
 #include "ns3/gnuplot.h"
-#include "Simulacion.h" // fichero de cabecera 
+#include "Simulacion.h" // fichero de cabecera
 
 using namespace ns3;
 NS_LOG_COMPONENT_DEFINE ("simulacion");
 
-/* 
+/*
 ** EN ESTE CÓDIGO SE VAN A CREAR LOS ENLACES P2P NECESARIOS PARA CONSTRUIR ESTE ESCENARIO
 **
 **
 **                        servidor    servidor    servidor
-**                                \      |       / 
+**                                \      |       /
 **  grupo enlaces 1 -->            \     |      /
 **                                  \    |     /
 **                                    routerSer
@@ -62,14 +63,48 @@ NS_LOG_COMPONENT_DEFINE ("simulacion");
 #define CAM_DELAY    "2ms"		// g3
 #define USER_DELAY   "3ms"		// g4
 
+#define P_ERROR      0.001    // probabilidad de error de todos los enlaces
+
+// parámetros de la transmisión de video
+#define MIN_START_VIDEO     "0s"
+#define MAX_START_VIDEO     "7h" // 3 robos por semana -> 3/7 = 0.42 -> 1 robo cada 3h/0.42=7h
+#define MEAN_DRTN_VIDEO     "15m"
+
+//definiciones generales
+#define NUM_USUARIOS 3000 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
+#define NUM_SERVIDORES 4
+#define ENLACES_TRONCALES 2
+#define NUM_NODOS_ENLACE 2 //numero de nodos por enlace
+//indices para la tablas
+#define ROUTER 0
+#define NODO_FINAL 1
 
 /************** Definición de tipos ***************/
 
 // Estructura para los enlaces del escenario
 typedef struct {
-  DataRate rate; 	// capacidad del enlace
-  Time delay; 		// Retardo de propagación del enlace
+  DataRate rate; // capacidad del enlace
+  Time delay;    // retardo de propagación
+  double perror;
 } LinkP2P;
+
+// Estructura para la aplicación de transmisión de video
+typedef struct {
+  Time minStartVideo; // tiempo mínimo de comienzo
+  Time maxStartVideo; // tiempo máximo de comienzo
+  Time meanDrtnVideo; // duración media
+} VideoApp;
+
+// Estructura para los parametros del escenario
+typedef struct {
+  LinkP2P serverLink;
+  LinkP2P routersLink;
+  LinkP2P camLink;
+  LinkP2P userLink;
+  VideoApp alarmVideo;
+  uint32_t numServers;
+  uint32_t numUsers;
+} ParamsEscenario;
 
 
 /************ Definición de funciones *************/
@@ -82,30 +117,237 @@ typedef struct {
 **
 */
 
-void escenario(LinkP2P routerLink, LinkP2P serverLink, LinkP2P camLink, LinkP2P userLink);
+void escenario(ParamsEscenario paramsEscenario);
 
 int main (int argc, char *argv[]) {
+  NS_LOG_FUNCTION("Función main: configuración de los parámetros y generación de gráficas");
   // Establecemos la resolución a nanosegundos y habilitamos checksum
   Time::SetResolution(Time::NS);
   GlobalValue::Bind ("ChecksumEnabled", BooleanValue(true));
 
-  // Parámetros del modelo
+  /** Parámetros de los enlaces del modelo **/
 
-  // grupo 1
+  // - grupo de enlaces 1
+  LinkP2P serverLink;
   DataRate serverRate (SERVER_RATE);
   Time serverDelay (SERVER_DELAY);
-
-  // grupo 2
+  // - grupo de enlaces 2
+  LinkP2P routerLink;
   DataRate routerRate (ROUTER_RATE);
-  Time routerDelay (ROUTER_DELAY);  
-
-  // grupo 3
+  Time routerDelay (ROUTER_DELAY);
+  double routerPerror = P_ERROR;
+  // - grupo de enlaces 3
+  LinkP2P camLink
   DataRate camRate (CAM_RATE);
   Time camDelay (CAM_DELAY);
+  // - grupo de enlaces 4
+  LinkP2P userLink
+  DataRate userRate (USER_RATE);
+  Time userDelay (USER_DELAY);
 
-  // grupo 4
-  DataRate usrRate (USER_RATE);
-  Time usrDelay (USER_DELAY);
+  /** Parámetros de las aplicaciones **/
+
+  // - aplicación para la transmisión de video
+  VideoApp alarmVideo;
+  Time minStartVideo (MIN_START_VIDEO);
+  Time maxStartVideo (MAX_START_VIDEO);
+  Time meanDrtnVideo (MEAN_DRTN_VIDEO);
+
+
+  /** Parámetros de la simulación **/
+  uint32_t numServers = NUM_SERVIDORES;
+  uint32_t numUsers = NUM_USUARIOS;
+
+
+  /** Añadimos los parametros configurables por linea de comando **/
+  CommandLine cmd = CommandLine();
+  // Parámetros de la topología
+  cmd.AddValue ("tasaServidores", "Capacidad de los enlaces a los servidores", serverRate);
+  cmd.AddValue ("tasaRouters", "Capacidad de los enlaces entre routers", routerRate);
+  cmd.AddValue ("tasaCamaras", "Capacidad de los enlaces a las camaras", camRate);
+  cmd.AddValue ("tasaUsuarios", "Capacidad de los enlaces a los usuarios", userRate);
+  cmd.AddValue ("perror", "Probabilidad de error de paquete de los enlaces", perror);
+  cmd.AddValue ("minStartVideo", "Tiempo mínimo de comienzo de transmisión de video", minStartVideo);
+  cmd.AddValue ("maxStartVideo", "Tiempo máximo de comienzo de transmisión de video", maxStartVideo);
+  cmd.AddValue ("duracionVideo", "Duración media de la transmisión de video", meanDrtnVideo);
+  cmd.AddValue ("numServidores", "Número de servidores", numServers);
+  cmd.AddValue ("numUsuarios", "Número de usuarios", numUsers);
+  cmd.Parse (argc, argv);
+
+
+  /** Añadimos parámetros al escenario **/
+  serverLink.rate = serverRate;
+  serverLink.delay = serverDelay;
+
+  routerLink.rate = routerRate;
+  routerLink.delay = routerDelay;
+  routerLink.perror = routerPerror;
+
+  camLink.rate = serverRate;
+  camLink.delay = serverDelay;
+
+  userLink.rate = serverRate;
+  userLink.delay = serverDelay;
+
+  alarmVideo.minStartVideo = minStartVideo;
+  alarmVideo.maxStartVideo = maxStartVideo;
+  alarmVideo.meanDrtnVideo = meanDrtnVideo;
+
+  ParamsEscenario paramsEscenario; // estructura con los parámetros de la simulación
+  paramsEscenario.serverLink = serverLink;
+  paramsEscenario.routerLink = routerLink;
+  paramsEscenario.camLink = camLink;
+  paramsEscenario.userLink = userLink;
+  paramsEscenario.alarmVideo = alarmVideo;
+  paramsEscenario.numServers = numServers;
+  paramsEscenario.numUsers = numUsers;
+
+  escenario(paramsEscenario);
 
   return 0;
 }
+
+
+void escenario(ParamsEscenario paramsEscenario){
+  NS_LOG_FUNCTION("Funcion escenario: configuracion basica de un escenario y simulacion");
+
+  /** Configuración del escenario **/
+  // Creamos los nodos de cada grupo de enlaces
+  NodeContainer grupoUno[paramsEscenario.numServers];
+  NodeContainer grupoDos[ENLACES_TRONCALES];
+  NodeContainer grupoTres[paramsEscenario.numUsers];
+  NodeContainer grupoCuatro[paramsEscenario.numUsers];
+
+  // Enlaces grupo dos (troncales)
+  // - enlace servidores - cámaras
+  grupoDos[G1_G3].Create(2);
+  // - enlace servidores - usuarios
+  grupoDos[G1_G4].Add(grupoDos[G1_G3].Get(0));
+  grupoDos[G1_G4].Create(1);
+
+  // Enlaces grupo uno (servidores)
+  for (uint32_t enlace = 0; enlace < paramsEscenario.numServers; enlace++) {
+    grupoUno[enlace].Add(grupoDos[G1_G3].Get(0));
+    grupoUno[enlace].Create(NODO_FINAL);
+  }
+  // Enlaces grupo tres (cámaras) y cuatro (usuarios)
+  for (uint32_t enlace = 0; i < paramsEscenario.numUsers; enlace++) {
+    grupoTres[enlace].Add(grupoDos[G1_G3].Get(1));
+    grupoTres[enlace].Create(NODO_FINAL);
+    grupoCuatro[enlace].Add(grupoDos[G1_G4].Get(1));
+    grupoCuatro[enlace].Create(NODO_FINAL);
+  }
+
+  // Configuramos los enlaces punto a punto
+  PointToPointHelper enlaceServidores;
+  enlaceServidores.SetDeviceAttribute ("DataRate", DataRateValue(paramsEscenario.serverLink.rate));
+  enlaceServidores.SetChannelAttribute ("Delay", TimeValue (paramsEscenario.serverLink.delay));
+
+  PointToPointHelper enlaceRouters;
+  enlaceRouters.SetDeviceAttribute ("DataRate", DataRateValue(paramsEscenario.routerLink.rate));
+  enlaceRouters.SetChannelAttribute ("Delay", TimeValue (paramsEscenario.routerLink.delay));
+
+  PointToPointHelper enlaceCamaras;
+  enlaceCamaras.SetDeviceAttribute ("DataRate", DataRateValue(paramsEscenario.camLink.rate));
+  enlaceCamaras.SetChannelAttribute ("Delay", TimeValue (paramsEscenario.camLink.delay));
+
+  PointToPointHelper enlaceUsuarios;
+  enlaceUsuarios.SetDeviceAttribute ("DataRate", DataRateValue(paramsEscenario.userLink.rate));
+  enlaceUsuarios.SetChannelAttribute ("Delay", TimeValue (paramsEscenario.userLink.delay));
+
+  // Establecemos el modelo de errores entre routers
+  Ptr<RateErrorModel> remRouter = CreateObject<RateErrorModel> ();
+  Ptr<UniformRandomVariable> uvRouter = CreateObject<UniformRandomVariable> ();
+  remRouter->SetRandomVariable (uvRouter);
+  remRouter->SetUnit(RateErrorModel::ERROR_UNIT_PACKET);
+  remRouter->SetRate (paramsEscenario.routerLink.perror);
+  enlaceRouters.SetDeviceAttribute("ReceiveErrorModel", PointerValue(remRouter));
+
+  //creamos un tabla para los NetDeviceContainer
+  NetDeviceContainer devicesGrupo1 [paramsEscenario.numServers];
+  for (uint32_t n_nodo = 0; i < paramsEscenario.numServers; i++) {
+    devicesGrupo1[n_nodo] = enlaceServidores.Install(grupoUno[n_nodo]);
+  }
+  NetDeviceContainer devicesGrupo2 [ENLACES_TRONCALES];
+  for (uint32_t n_nodo = 0; i < ENLACES_TRONCALES; i++) {
+    devicesGrupo2[n_nodo] = enlaceRouters.Install(grupoDos[n_nodo]);
+  }
+  NetDeviceContainer devicesGrupo3 [paramsEscenario.numUsers];
+  NetDeviceContainer devicesGrupo4 [paramsEscenario.numUsers];
+  for (uint32_t n_nodo = 0; i < paramsEscenario.numUsers; i++) {
+    devicesGrupo3[n_nodo] = enlaceCamaras.Install(grupoTres[n_nodo]);
+    devicesGrupo4[n_nodo] = enlaceUsuarios.Install(grupoCuatro[n_nodo]);
+  }
+
+  // Instalamos la pila TCP/IP en todos los nodos
+  InternetStackHelper stack;
+  for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numServers; n_nodo++){
+    stack.Install (grupoUno[n_nodo]);
+  }
+  for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numUsers; n_nodo++){
+    stack.Install (grupoTres[n_nodo]);
+    stack.Install (grupoCuatro[n_nodo]);
+  }
+
+  //asignamos direcciones al grupo1
+  Ipv4AddressHelper addressesGrupo1 [paramsEscenario.numServers];
+  Ipv4InterfaceContainer interfacesGrupo1 [paramsEscenario.numServers];
+  for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numServers; n_nodo++){
+        std::string dir("10.1."+std::to_string(n_nodo+1)+".0");
+        NS_LOG_DEBUG("direccion ip enlace "<<n_nodo<<"="<<dir);
+        char *dir_buff = new char[9];//9 es el tamano que tendra la ip
+        strncpy(dir_buff, dir.c_str(), 9);
+        addressesGrupo1[n_nodo].SetBase(dir_buff, "255.255.255.0");
+        interfacesGrupo1[n_nodo] = addressesGrupo1[n_nodo].Assign (devicesGrupo1[n_nodo]);
+  }
+  //asignamos direcciones al grupo2
+  Ipv4AddressHelper addressesGrupo2 [ENLACES_TRONCALES];
+  Ipv4InterfaceContainer interfacesGrupo2 [ENLACES_TRONCALES];
+  for(uint32_t n_nodo = 0; n_nodo < ENLACES_TRONCALES; n_nodo++){
+        std::string dir("10.2."+std::to_string(n_nodo+1)+".0");
+        NS_LOG_DEBUG("direccion ip enlace "<<n_nodo<<"="<<dir);
+        char *dir_buff = new char[9];//9 es el tamano que tendra la ip
+        strncpy(dir_buff, dir.c_str(), 9);
+        addressesGrupo2[n_nodo].SetBase(dir_buff, "255.255.255.0");
+        interfacesGrupo2[n_nodo] = addressesGrupo2[n_nodo].Assign (devicesGrupo2[n_nodo]);
+  }
+  //asignamos direcciones al grupo3
+  Ipv4AddressHelper addressesGrupo3 [paramsEscenario.numUsers];
+  Ipv4InterfaceContainer interfacesGrupo3 [paramsEscenario.numUsers];
+  Ipv4AddressHelper addressesGrupo4 [paramsEscenario.numUsers];
+  Ipv4InterfaceContainer interfacesGrupo4 [paramsEscenario.numUsers];
+
+  uint32_t n_nodo = 0;
+  for(uint32_t segundaPosIP = 0; segundaPosIP <= 255; segundaPosIP++){
+    for(uint32_t terceraPosIP = 0; terceraPosIP <= 255; terceraPosIP++){
+      if(n_nodo < paramsEscenario.numUsers) {
+        std::string dir("13."+std::to_string(segundaPosIP)+"."+std::to_string(terceraPosIP)+".0");
+        NS_LOG_DEBUG("direccion ip enlace "<<n_nodo<<"="<<dir);
+        char *dir_buff = new char[9];//9 es el tamano que tendra la ip
+        strncpy(dir_buff, dir.c_str(), 9);
+        addressesGrupo3[n_nodo].SetBase(dir_buff, "255.255.255.0");
+        interfacesGrupo3[n_nodo] = addressesGrupo3[n_nodo].Assign (devicesGrupo3[n_nodo]);
+
+        std::string dir("14."+std::to_string(segundaPosIP)+"."+std::to_string(terceraPosIP)+".0");
+        NS_LOG_DEBUG("direccion ip enlace "<<n_nodo<<"="<<dir);
+        char *dir_buff = new char[9];//9 es el tamano que tendra la ip
+        strncpy(dir_buff, dir.c_str(), 9);
+        addressesGrupo4[n_nodo].SetBase(dir_buff, "255.255.255.0");
+        interfacesGrupo4[n_nodo] = addressesGrupo4[n_nodo].Assign (devicesGrupo4[n_nodo]);
+
+        //incrementamos el nodo.
+        n_nodo++;
+      }
+    }
+  }
+    
+  //poblamos las tablas de rutas
+  Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+  /** Configuración de las aplicaciones **/
+  // variables aleatorias con el tiempo de comienzo y fin de la app
+  Ptr<RandomVariableStream> alarmVideoStart = CreateObject<UniformRandomVariable>();
+  Ptr<RandomVariableStream> alarmVideoStop = CreateObject<UniformRandomVariable>();
+  videoStart.SetAttribute("Min", DoubleValue(minStartVideo.GetDouble()))
+}
+//La simulacion hay que pararla manualmente.
