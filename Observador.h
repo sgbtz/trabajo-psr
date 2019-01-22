@@ -40,9 +40,9 @@ using namespace ns3;
 
 struct ParametrosObservador {
 
-	Ptr<ApplicationContainer> camaras;
-	Ptr<ApplicationContainer> usuarios;
-	Ptr<ApplicationContainer> servidores;
+	Ptr<PointToPointNetDevice> camara;
+	Ptr<PointToPointNetDevice> usuario;
+	Ptr<PointToPointNetDevice> servidor;
 
 	Ptr<PointToPointNetDevice> enlaceRoutersIzq;
 	Ptr<PointToPointNetDevice> enlaceRoutersDer;
@@ -56,11 +56,21 @@ class Observador : public Object {
 	// funciones get
 
 	private:
-	Ptr<ApplicationContainer> camaras;
-	Ptr<ApplicationContainer> usuarios;
-	Ptr<ApplicationContainer> servidores;
+
+	void Rx(Ptr<const Packet> packet);
+	void Tx(Ptr<const Packet> packet);
+
+	Ptr<PointToPointNetDevice> m_camara;
+	Ptr<PointToPointNetDevice> m_usuario;
+	Ptr<PointToPointNetDevice> m_servidor;
 
 	Ptr<PointToPointNetDevice> enlaceRoutersIzq;
 	Ptr<PointToPointNetDevice> enlaceRoutersDer;
+
+	std::map<Ipv4Address, uint32_t> mapaPqtTx;
+	std::map<Ipv4Address, uint32_t> mapaPqtRx;
+
+
+
 
 }
