@@ -38,14 +38,17 @@
 
 using namespace ns3;
 
+
+#define TCP 6
+#define UDP 17
+
 struct ParametrosObservador {
 
 	Ptr<PointToPointNetDevice> camara;
 	Ptr<PointToPointNetDevice> usuario;
 	Ptr<PointToPointNetDevice> servidor;
+	Ipv4Address ip_cliente;
 
-	Ptr<PointToPointNetDevice> enlaceRoutersIzq;
-	Ptr<PointToPointNetDevice> enlaceRoutersDer;
 
 };
 
@@ -57,20 +60,47 @@ class Observador : public Object {
 
 	private:
 
+/*
 	void Rx(Ptr<const Packet> packet);
 	void Tx(Ptr<const Packet> packet);
 
 	Ptr<PointToPointNetDevice> m_camara;
 	Ptr<PointToPointNetDevice> m_usuario;
-	Ptr<PointToPointNetDevice> m_servidor;
 
-	Ptr<PointToPointNetDevice> enlaceRoutersIzq;
-	Ptr<PointToPointNetDevice> enlaceRoutersDer;
+	uint32_t m_contadorPqtRx;
+	uint32_t m_contadorPqtTx;
 
-	std::map<Ipv4Address, uint32_t> mapaPqtTx;
-	std::map<Ipv4Address, uint32_t> mapaPqtRx;
+	Ipv4Address m_ipCliente;
 
+	//Variables para calcular los estadisticos
+	Average<double> m_retardoMedio;
+	Average<double> m_variacionRetardo;
 
+	//Mapa para calcular el retardo del streaming
+ 	std::map<uint32_t, Time> mapaTiempos;
+	//Primer retardo para calcular la variacion
+	Time m_primerRetardo;
+	//Segundo retardo para calcular la variacion
+	Time m_segundoRetardo;
+	BooleanValue flagFirstDelay;
+*/
 
+	// variables parámetro
+	Ptr<Application> m_camara;
+	Ptr<Application> m_usuario;
+	Ptr<Application> m_servidor;
+	Ipv4Address m_ipCamara;
+
+	// variables estadísticas Streaming Camara -> Servidor
+	uint64_t StreamingServidor_CuentaTx;
+	uint64_t StreamingServidor_CuentaRx;
+	Average<double> StreamingServidor_PorcentajeCorrectos;
+	Average<double> StreamingServidor_Retardo;
+
+	// variables estadísticas Streaming Camara -> Usuario
+	uint64_t StreamingUsuario_CuentaTx;
+	uint64_t StreamingUsuario_CuentaRx;
+	Average<double> StreamingUsuario_PorcentajeCorrectos;
+	Average<double> StreamingUsuario_Retardo;
 
 }
