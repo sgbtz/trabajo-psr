@@ -67,7 +67,7 @@ NS_LOG_COMPONENT_DEFINE ("simulacion");
 
 // parámetros de la transmisión de video
 #define MIN_START_VIDEO     "0s"
-#define MAX_START_VIDEO     "7h" // 3 robos por semana -> 3/7 = 0.42 -> 1 robo cada 3h/0.42=7h
+#define MAX_START_VIDEO     "7h" // 3 alarms por semana -> 3/7 = 0.42 -> 1 alarm cada 3h/0.42=7h
 #define MEAN_DRTN_VIDEO     "15min"
 
 // definiciones generales
@@ -76,6 +76,8 @@ NS_LOG_COMPONENT_DEFINE ("simulacion");
 #define NUM_PREMIUM         0
 #define ENLACES_TRONCALES   2
 #define NUM_NODOS_ENLACE    2 //numero de nodos por enlace
+#define T_START             "0s"
+#define T_STOP              "3h"
 // indices para la tablas
 #define G1_G3       0
 #define G1_G4       1
@@ -98,9 +100,6 @@ typedef struct {
   Time meanDrtnVideo; // duración media
 } VideoApp;
 
-typedef struct {
-  Time stopTime;
-} Simulacion;
 // Estructura para los parametros del escenario
 typedef struct {
   LinkP2P serverLink;
@@ -111,6 +110,8 @@ typedef struct {
   uint32_t numServers;
   uint32_t numUsers;
   uint32_t numPremium;    // numero de clientes premium
+  Time tstart;            // comienzo simulación
+  Time tstop;             // fin simulación
 } ParamsEscenario;
 
 
@@ -131,10 +132,6 @@ int main (int argc, char *argv[]) {
   // Establecemos la resolución a nanosegundos y habilitamos checksum
   Time::SetResolution(Time::NS);
   GlobalValue::Bind ("ChecksumEnabled", BooleanValue(true));
-
-  //parametros de las simulaciones
-  Simulacion simulacion;
-  Time stopTime = Time(STOP_TIME);
 
   /** Parámetros de los enlaces del modelo **/
 
@@ -170,6 +167,8 @@ int main (int argc, char *argv[]) {
   uint32_t numServers = NUM_SERVIDORES;
   uint32_t numUsers = NUM_USUARIOS;
   uint32_t numPremium = NUM_PREMIUM;
+  Time tstart(T_START);
+  Time tstop(T_STOP);
 
 
   /** Añadimos los parametros configurables por linea de comando **/
@@ -186,12 +185,12 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("numServidores", "Número de servidores", numServers);
   cmd.AddValue ("numUsuarios", "Número de usuarios", numUsers);
   cmd.AddValue ("clientesPremium", "numero de usuarios premium", cliPremium);
-  cmd.AddValue ("stopTime", "momento final de la simulacion", stopTime);
+  cmd.AddValue ("startTime", "momento final de la simulacion", tstart);
+  cmd.AddValue ("stopTime", "momento final de la simulacion", tstop);
 
   cmd.Parse (argc, argv);
 
   /** Añadimos parámetros al escenario **/
-  simulacion.stopTime = stopTime;
 
   serverLink.rate = serverRate;
   serverLink.delay = serverDelay;
@@ -219,6 +218,8 @@ int main (int argc, char *argv[]) {
   paramsEscenario.numServers = numServers;
   paramsEscenario.numUsers = numUsers;
   paramsEscenario.numPremium = numPremium;
+  paramsEscenario.tstart = tstart;
+  paramsEscenario.tstop = tstop;
 
 
   escenario(paramsEscenario);
@@ -393,96 +394,100 @@ void escenario(ParamsEscenario paramsEscenario){
   NodeContainer usuarioPremium;
   NodeContainer usuarioNoPremium;
   for(uint32_t usuario=0; usuario<paramsEscenario.numUsers; usuario++){
-    //los numPremium primeros usuarios seran premium, el resto best-effort
+    // los numPremium primeros usuarios seran premium, el resto best-effort
     if(usuario < paramsEscenario.numPremium){
-      camarasPremium.Add(grupo3[usuario]);
-      usuarioPremium.Add(grupo4[usuario]);
+      camarasPremium.Add(grupoTres[usuario]);
+      usuarioPremium.Add(grupoCuatro[usuario]);
     }else{
-      camarasNoPremium.Add(grupo3[usuario]);
-      usuarioNoPremium.Add(grupo4[usuario]);
+      camarasNoPremium.Add(grupoTres[usuario]);
+      usuarioNoPremium.Add(grupoCuatro[usuario]);
     }
   }
   /*__________________________________________**
   ** Creacion de aplicaciones y configuracion **
   **------------------------------------------**/
-  //creamos helpers para crear los sumideros de video y de informes.
+  // creamos helpers para crear los sumideros de video y de informes.
   uint16_t videoPort = 9;
   uint16_t informePort = 10;
   PacketSinkHelper receptorVideoHelper ("ns3::UdpSocketFactory", Address (InetSocketAddress (Ipv4Address::GetAny(), videoPort)));
   PacketSinkHelper receptorInformeHelper ("ns3::TcpSocketFactory", Address (InetSocketAddress (Ipv4Address::GetAny(), informePort)));
 
-  //instalamos los sumideros en los servidores
-  for (uint32_t n_nodo = 0; n_nodo < paramsEscenario.numServers; n_nodo++) {
-    ApplicationContainer receptorVideoServidor = receptorVideoHelper.Install(grupo1[n_nodo].Get(NODO_FINAL));
-    receptorVideoServidor.Start(Seconds(0.0));
-    ApplicationContainer receptorInformeServidor = receptorInformeHelper.Install(grupo1[n_nodo].Get(NODO_FINAL));
-    receptorInformeServidor.Start(Seconds(0.0));
+  // instalamos los sumideros en los servidores
+  ApplicationContainer receptorVideoServidor[paramsEscenario.numServers];
+  ApplicationContainer receptorInformeServidor[paramsEscenario.numServers];
+  for (uint32_t n_server = 0; n_server < paramsEscenario.numServers; n_server++) {
+    receptorVideoServidor[n_server] = receptorVideoHelper.Install(grupoUno[n_server].Get(NODO_FINAL));
+    receptorVideoServidor[n_server].Start(T_START);
+    receptorInformeServidor[n_server] = receptorInformeHelper.Install(grupoUno[n_server].Get(NODO_FINAL));
+    receptorInformeServidor[n_server].Start(T_START);
   }
-  //instalamos los sumideros en los usuarios.
-  for (uint32_t n_nodo = 0; n_nodo < paramsEscenario.numUsers; n_nodo++) {
-    ApplicationContainer receptorVideoUsuario = receptorVideoHelper.Install(grupo4[n_nodo].Get(NODO_FINAL));
-    receptorVideoUsuario.Start(Seconds(0.0));
-    ApplicationContainer receptorInformeUsuario = receptorInformeHelper.Install(grupo4[n_nodo].Get(NODO_FINAL));
-    receptorInformeUsuario.Start(Seconds(0.0));
+  // instalamos los sumideros en los usuarios.
+  ApplicationContainer receptorVideoUsuario[paramsEscenario.numUser];
+  ApplicationContainer receptorInformeUsuario[paramsEscenario.numUser];
+  for (uint32_t n_user = 0; n_user < paramsEscenario.numUsers; n_user++) {
+    receptorVideoUsuario[n_user] = receptorVideoHelper.Install(grupoCuatro[n_user].Get(NODO_FINAL));
+    receptorVideoUsuario[n_user].Start(T_START);
+    receptorInformeUsuario[n_user] = receptorInformeHelper.Install(grupoCuatro[n_user].Get(NODO_FINAL));
+    receptorInformeUsuario[n_user].Start(T_START);
   }
 
 
-  //emisores de video hacia los usuarios desde los servidores. Tendremos un container por app
-  ApplicationContainer appVideoServidor2Usuarios[paramsEscenario.numUsers];
-  //lo mismo con las aplicaciones de video.
-  ApplicationContainer appInformeServidor2Usuarios[paramsEscenario.numUsers];
-  ApplicationContainer appInformeCamara2Servidor[paramsEscenario.numUsers];
-  ApplicationContainer appVideoCamara2Servidor[paramsEscenario.numUsers];
+  /*emisores de video hacia los usuarios desde los servidores. Tendremos un container por app
+  ApplicationContainer appVideoServidor2Usuarios[paramsEscenario.numUsers];*/
+  // Aplicaciones de transmisión
+  ApplicationContainer appInformeCam2Server[paramsEscenario.numUsers]; // envío periódico de informe de la cámara al servidor
+  ApplicationContainer appInformeServer2User[paramsEscenario.numUsers]; // envío de informe del servidor al usuario
+  ApplicationContainer appAlarmVideoCam2Server[paramsEscenario.numUsers]; // streaming de vídeo por alarma al servidor
+  ApplicationContainer appAlarmVideoCam2User[paramsEscenario.numUsers]; // streaming de vídeo por alarma al usuario
 
-  //configuramos e instalamos las aplicaciones en las camaras y los servidores, las camaras y usuarios respectivos estaran
-  //conectadas al mismo servidor, ademas, para simular el streaming se iniciaran a la VEZ
-  //la transmision desde la camara al servidor y desde el servidor al usuario.
+  // configuramos e instalamos las aplicaciones en las camaras y los servidores, las camaras y usuarios respectivos estaran
+  // conectadas al mismo servidor, ademas, para simular el streaming se iniciaran a la VEZ <----- Esto se va a cambiar ???
+  // la transmision desde la camara al servidor y desde el servidor al usuario.
   for (uint32_t n_nodo = 0; n_nodo < paramsEscenario.numUsers; n_nodo++) {
-    //v.a. para modelar el momento y duracion del robo
-    Ptr<RandomVariableStream> roboStart = CreateObject<UniformRandomVariable>();
-    Ptr<ExponentialRandomVariable> roboTime = CreateObject<ExponentialRandomVariable>();
-    roboTime->SetAttribute("Mean", DoubleValue(paramsEscenario.alarmVideo.meanDrtnVideo));
-    //v.a. para modelar el tamano y momneto de envio del informes
+    // v.a. para modelar el momento y duracion de la alarma (robo o falsa)
+    Ptr<RandomVariableStream> alarmStart = CreateObject<UniformRandomVariable>();
+    Ptr<ExponentialRandomVariable> alarmTime = CreateObject<ExponentialRandomVariable>();
+    alarmTime->SetAttribute("Mean", DoubleValue(paramsEscenario.alarmVideo.meanDrtnVideo));
+    //v.a. para modelar el tamano y momento de envio del informes
     Ptr<RandomVariableStream> momentoEnvioInforme = CreateObject<UniformRandomVariable>();
     Ptr<ExponentialRandomVariable> informeSize = CreateObject<ExponentialRandomVariable>();
     informeSize->SetAttribute("Mean", DoubleValue(paramsEscenario.tamMedioInforme));
 
-    //obtenems y guardamos los valores de incio de las alarmas y su duracion.
-    double valoresInicioAlarma = roboStart.GetValue(paramsEscenario.alarmVideo.minStartVideo.GetDouble(), paramsEscenario.alarmVideo.maxStartVideo.GetDouble());
-    double duracionAlarma = roboTime.GetValue();
-    //guardamos los valores de incio de transmision y de tamano de los informe
-    double tamanoInformes = informeSize.GetValue();
-    //considerramos que los informes se piden entre el minimo de la primera alarma y el final de la simulacion.
-    double inicioTxInforme = momentoEnvioInforme.GetValue(paramsEscenario.alarmVideo.minStartVideo.GetDouble(), paramsEscenario.simulacion.stopTime);
+    // obtenemos y guardamos los valores de incio de las alarmas y su duracion.
+    double inicioAlarma = alarmStart.GetValue(paramsEscenario.alarmVideo.minStartVideo.GetDouble(), paramsEscenario.alarmVideo.maxStartVideo.GetDouble());
+    double duracionAlarma = alarmTime.GetValue();
+    // guardamos los valores de incio de transmision y de tamano de los informe
+    double tamInformes = informeSize.GetValue();
+    // los informes se solicitan tras el final de la alarma
+    double inicioTxInforme = inicioAlarma + duracionAlarma;
 
-    //creamos los helpers para las emisiones de contenido.
-    BulkSendHelper emisorVideoServidor2Usuarios = BulkSendHelper("ns3::UdpSocketFactory", Address (InetSocketAddress (interfacesGrupo4[n_nodo].GetAddress(NODO_FINAL),videoPort)));
-    BulkSendHelper emisorInformeServidor2Usuarios = BulkSendHelper("ns3::TcpSocketFactory", Address (InetSocketAddress (interfacesGrupo4[n_nodo].GetAddress(NODO_FINAL),informePort)));
-    //configuramos con las v.a. el emisor de video en streaming cuando hay robo.
-    emisorVideoServidor2Usuarios.SetAttribute("StartTime", TimeValue(valoresInicioAlarma));
-    emisorVideoServidor2Usuarios.SetAttribute("StopTime", TimeValue(valoresInicioAlarma + duracionAlarma));
-    //configuramos los helpers para emision de informes.
-    emisorInformeServidor2Usuarios.SetAttribute("StartTime", TimeValue(inicioTxInforme));
-    emisorInformeServidor2Usuarios.SetAttribute("SendSize", UintegerValue(tamanoInformes));
-
-    //realizamos las instalaciones
-    //para simular que los usuarios estan repartidos entre los servidores usaremos una variable aleatoria que determinara el servidor al que se conecta el usuario.
+    // para simular que los usuarios estan repartidos entre los servidores usaremos una variable aleatoria que determinara el servidor al que se conecta el usuario.
     Ptr<UniformRandomVariable> conectarCon = CreateObject<UniformRandomVariable>();
-    uint32_t servidor = (uint32_t) conectarCon.GetValue(0, paramsEscenario.numServers-1); //tanto la camara como la aplicacion del usuario conectaran con el mismo servidor, determinado por esta variable.
-    appVideoServidor2Usuarios[n_nodo] = emisorVideoServidor2Usuarios[n_nodo].Install(grupo1[servidor]);
-    appInformeServidor2Usuarios[n_nodo] = emisorInformeServidor2Usuarios[n_nodo].Install(grupo1[servidor]);
+    uint32_t conServer = (uint32_t) conectarCon.GetValue(0, paramsEscenario.numServers-1); //tanto la camara como la aplicacion del usuario conectaran con el mismo servidor, determinado por esta variable.
 
-    //creamos helpers para enviar desde las camaras a los servidores
-    BulkSendHelper emisorVideoCamara2Servidor = BulkSendHelper("ns3::UdpSocketFactory", Address (InetSocketAddress (interfacesGrupo1[servidor],videoPort)));
-    BulkSendHelper emisorInformeCamara2Servidor = BulkSendHelper("ns3::TcpSocketFactory", Address (InetSocketAddress (interfacesGrupo1[servidor],informePort)));;
-    //configuramos tanto el emisor de informes como el de video con los mismos parametros que entrem servidor y usuario para simular que es desde la camra al usuario pasando por el servidor.
-    emisorVideoCamara2Servidor.SetAttribute("StartTime", TimeValue(valoresInicioAlarma));
-    emisorVideoCamara2Servidor.SetAttribute("StopTime", TimeValue(valoresInicioAlarma + duracionAlarma));
-    emisorInformeCamara2Servidor.SetAttribute("StartTime", TimeValue(inicioTxInforme));
-    emisorInformeCamara2Servidor.SetAttribute("SendSize", UintegerValue(tamanoInformes));
-    //las instalamos.
-    appVideoCamara2Servidor[n_nodo] = emisorVideoCamara2Servidor[n_nodo].Install(grupo3[n_nodo]);
-    appInformeCamara2Servidor[n_nodo] = emisorInformeCamara2Servidor[n_nodo].Install(grupo3[n_nodo]);
+    // creamos los helpers para las emisiones de contenido.
+    BulkSendHelper emisorAlarmVideoCam2User = BulkSendHelper("ns3::UdpSocketFactory", Address (InetSocketAddress (interfacesGrupo4[n_nodo].GetAddress(NODO_FINAL), videoPort)));
+    BulkSendHelper emisorAlarmVideoCam2Server = BulkSendHelper("ns3::UdpSocketFactory", Address (InetSocketAddress (interfacesGrupo1[conServer],videoPort)));
+    BulkSendHelper emisorInformeServer2User = BulkSendHelper("ns3::TcpSocketFactory", Address (InetSocketAddress (interfacesGrupo4[n_nodo].GetAddress(NODO_FINAL), informePort)));
+    BulkSendHelper emisorInformeCam2Server = BulkSendHelper("ns3::TcpSocketFactory", Address (InetSocketAddress (interfacesGrupo1[conServer],informePort)));
+
+    // configuramos con las v.a. el emisor de video en streaming cuando hay alarma.
+    emisorAlarmVideoCam2User.SetAttribute("StartTime", TimeValue(inicioAlarma));
+    emisorAlarmVideoCam2User.SetAttribute("StopTime", TimeValue(inicioAlarma + duracionAlarma));
+    emisorAlarmVideoCam2Server.SetAttribute("StartTime", TimeValue(inicioAlarma));
+    emisorAlarmVideoCam2Server.SetAttribute("StopTime", TimeValue(inicioAlarma + duracionAlarma));
+    // configuramos los helpers para emision de informes.
+    /* la peticion de transmision de informe del servidor al usuario viene dada por unos patrones de tiempo (por determinar)
+    emisorInformeServer2User.SetAttribute("StartTime", TimeValue(inicioTxInforme));
+    emisorInformeServer2User.SetAttribute("SendSize", UintegerValue(tamInformes));*/
+    emisorInformeCam2Server.SetAttribute("StartTime", TimeValue(inicioTxInforme));
+    emisorInformeCam2Server.SetAttribute("SendSize", UintegerValue(tamInformes));
+
+    // realizamos las instalaciones
+    ApplicationContainer appInformeCam2Server[n_nodo] = emisorInformeCamara2Servidor[n_nodo].Install(grupoTres[n_nodo]);
+    ApplicationContainer appInformeServer2User[n_nodo] = emisorInformeServer2User.Install(grupoUno[conServer]);
+    ApplicationContainer appAlarmVideoCam2Server[n_nodo] = emisorAlarmVideoCam2Server.Install(grupoTres[n_nodo]);
+    ApplicationContainer appAlarmVideoCam2User[n_nodo] = emisorAlarmVideoCam2User.Install(grupoTres[n_nodo]);
   }
 
 
