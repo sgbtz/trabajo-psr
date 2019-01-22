@@ -56,6 +56,7 @@ class Observador : public Object {
 
 	public:
 	Observador (ParametrosObservador); // constructor
+
 	// funciones get
 
 	private:
@@ -89,7 +90,9 @@ class Observador : public Object {
 	Ptr<Application> m_camara;
 	Ptr<Application> m_usuario;
 	Ptr<Application> m_servidor;
+
 	Ipv4Address m_ipCamara;
+	Ipv4Address m_ipUsuario;
 
 	// variables estadísticas Streaming Camara -> Servidor
 	uint64_t StreamingServidor_CuentaTx;

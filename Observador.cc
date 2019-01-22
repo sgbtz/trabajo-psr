@@ -20,7 +20,10 @@ Observador::Observador ( ParametrosObservador paramObse ) {	// en el observador 
 	m_camara = paramObse.camara;
 	m_usuario = paramObse.usuario;
 	m_servidor = paramObse.servidor;
-	m_ipCamara = paramObse.ipCamara;
+
+	// obtener las IP de interés: usuario y camara
+	// ...
+	// ...
 
 	// iniciar variables estadísticas
 	StreamingServidor_CuentaTx = 0;
