@@ -35,12 +35,25 @@
 #include "ns3/traffic-control-layer.h"
 #include "ns3/traffic-control-helper.h"
 #include "ns3/inet-socket-address.h"
-#include <ns3/gnuplot.h>
-#include <ns3/queue.h>
-#include <ostream>
-#include <map>
+#include "ns3/gnuplot.h"
+#include "ns3/queue.h"
+
 
 using namespace ns3;
+
+class PrioPacketFilter : public Ipv4PacketFilter {
+public:
+  static TypeId GetTypeId (void);
+
+  PrioPacketFilter ();
+  virtual ~PrioPacketFilter ();
+
+private:
+  virtual uint32_t DoClassify (Ptr<Ipv4QueueDiscItem> item) const;
+
+  uint32_t m_premiumMaxIp;
+};
+
 
 // observador
 
