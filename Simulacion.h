@@ -41,6 +41,7 @@
 
 using namespace ns3;
 
+namespace ns3 {
 class PrioPacketFilter : public Ipv4PacketFilter {
 public:
   static TypeId GetTypeId (void);
@@ -53,7 +54,7 @@ private:
 
   uint32_t m_premiumMaxIp;
 };
-
+}
 
 // observador
 
