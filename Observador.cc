@@ -1,135 +1,107 @@
 #include "Observador.h"
-#include "simulacion.h"
 
 using namespace ns3;
 NS_LOG_COMPONENT_DEFINE ("Observador");
 
-struct ParametrosObservador {
-	Ptr<Application> camara;
-	Ptr<Application> usuario;
-	Ptr<Application> servidor;
-};
-
-// *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *
-
 // constructor de la clase
-Observador::Observador ( ParametrosObservador paramObse ) {	// en el observador se reciben los elementos de interés del escenario
+Observador::Observador ( ParametrosObservador parametros ) {	// en el observador se reciben los elementos de interés del escenario
 	NS_LOG_FUNCTION("Comienzo");
+	 	m_camara = parametros.camara;
+	 	m_servidor = parametros.servidor;
+	 	m_usuario = parametros.usuario;
+		m_maxIpServidor = parametros.maxIpServidor;
 
-	// obtener los parámetros e inicializarlos
-	m_camara = paramObse.camara;
-	m_usuario = paramObse.usuario;
-	m_servidor = paramObse.servidor;
+		m_contadorPqtVideoCamara2Servidor = 0;
+		m_contadorPqtInformeCamara2Servidor = 0;
+		m_contadorPqtVideoCamara2Usuario = 0;
 
-	// obtener las IP de interés: usuario y camara
-	// ...
-	// ...
+		pqtTxVidCam2Usr = 0;
+		pqtTxVidCam2Serv = 0;
+		pqtTxVidCam2Serv = 0;
+		pqtRxVidCam2Serv = 0;
+		pqtTxInfCam2Serv = 0;
+		pqtRxInfCam2Serv = 0;
 
-	// iniciar variables estadísticas
-	StreamingServidor_CuentaTx = 0;
-	StreamingServidor_CuentaRx = 0;
-	StreamingUsuario_CuentaTx = 0;
-	StreamingUsuario_CuentaRx = 0;
+		flagFirsDelayVidCam2Usr = true;
+		flagFirsDelayVidCam2Serv = true;
 
-	// suscribir a trazas
-	m_camara->TraceConnectWithoutContext("Tx", MakeCallback (&Observador::CamaraTx, this));
-	m_servidor->TraceConnectWithoutContext("Rx", MakeCallback (&Observador::ServidorRx, this));
-	m_usuario->TraceConnectWithoutContext("Rx", MakeCallback (&Observador::UsuarioRx, this));
+		//Nos suscrimos a las trazas de transmision de las camaras
+		m_camara->TraceConnectWithoutContext("MacTx", MakeCallback (&Observador::CamaraTx, this));
+		//m_servidor->TraceConnectWithoutContext("MacTx", MakeCallback (&Observador::ServidorTx, this));
 
+		//Nos suscribimos a las trazas de recepcion de usuario y servidor.
+		m_usuario->TraceConnectWithoutContext("MacRx", MakeCallback (&Observador::UsuarioRx, this));
+		m_servidor->TraceConnectWithoutContext("MacRx", MakeCallback (&Observador::ServidorRx, this));
 }
 
-// *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *
 
-void Observador::CamaraTx (Ptr<const Packet> paquete) {
-	NS_LOG_FUNCTION("Comienzo");
-
-}
-
-// *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *
-
-
-void Observador::ServidorRx(Ptr<const Packet> paquete, const Address & direccionParam){
-	NS_LOG_FUNCTION("Comienzo");
-
-	// leer la dirección origen
-	InetSocketAddress miInetSocketAddress = (InetSocketAddress) InetSocketAddress::ConvertFrom(direccionParam);
-	Ipv4Address dirOrigen = miInetSocketAddress.GetIpv4();
-
-	// si proviene de la camara observada modificar estadísticos
-	if(dirOrigen == m_ipCamara){
-		StreamingServidor_CuentaRx ++;
-	}
-
-}
-
-// *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *
-
-void Observador::UsuarioRx(Ptr<const Packet> paquete, const Address & direccionParam){
-	NS_LOG_FUNCTION("Comienzo");
-
-	// leer la dirección origen
-	InetSocketAddress miInetSocketAddress = (InetSocketAddress) InetSocketAddress::ConvertFrom(direccionParam);
-	Ipv4Address dirOrigen = miInetSocketAddress.GetIpv4();
-
-	// si proviene de la camara observada modificar estadisticos
-	if(dirOrigen == m_ipCamara){
-		StreamingUsuario_CuentaRx ++;
-	}
-
-}
-
-// *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *
-
-/*	m_contadorPqtRx = 0;
-	m_contadorPqtTx = 0;
-	flagFirstDelay = true;
-*/
-	/* Nos subscribimos a las trazas de transmision de paquetes en las camaras, los usuarios y los servidores ya que
-		 los 3 envian trafico y queremos analizar el mismo.*/
-/*
-	m_camara->TraceConnectWithoutContext("MacTx", MakeCallback (&Observador::Tx, this));
-	m_usuario->TraceConnectWithoutContext("MacTx", MakeCallback (&Observador::Tx, this));
-*/
-	/*Nos subscribimos a las trazas de recepcion de paquetes para el analisis del trafico de las camaras, los usuarios
-		y los servidores.*/
-/*
-	m_camara->TraceConnectWithoutContext("MacRx", MakeCallback (&Observador::Rx, this));
-	m_usuario->TraceConnectWithoutContext("MacRx", MakeCallback (&Observador::Rx, this));
-*/
-
-
-
-/*
-void Observador::Tx (Ptr<const Packet> packet) {
-	NS_LOG_FUNCTION("Paquete transmitido");
+void Observador::CamaraTx (Ptr<const Packet> packet) {
+	NS_LOG_FUNCTION("Transmision por parte de la camara");
 
 	//Hacemos una copia del paquete original para poder modificarlo.
 	Ptr<Packet> pqt = packet->Copy();
-
 	//Obtenemos la cabecera a nivel de enlace y la quitamos
 	PppHeader ppp;
 	pqt->PeekHeader (ppp);
 	pqt->RemoveHeader(ppp);
-	//Obtenemos la cabecera a nivel IP para analizar el origen
-
+	//Obtenemos la cabecera a nivel IP para analizar el destino
 	Ipv4Header ip;
 	pqt->PeekHeader(ip);
 
-	m_contadorPqtTx;
-
-	//Observamos si se trata de trafico de streaming
+	//Guardamos los paquetes en mapas con su timepo dependiendo de si es video o informe.
 	uint8_t protocolo = ip.GetProtocol();
-
-	if ( protocolo == UDP )
-	{
-		mapaTiempos[packet->GetUid()] = Simulator::Now();
+	if ( protocolo == UDP ){
+		mapaEnviosCamaraVideo[packet->GetUid()] = Simulator::Now();
+		if(ip.GetDestination().Get() >= maxIpServidor){
+			pqtTxVidCam2Usr++;
+			NS_LOG_INFO("paquete enviado de camara a servidor");
+		}else{
+			pqtTxVidCam2Serv++;
+			NS_LOG_INFO("Paquete enviado de camara a usuario");
+		}
+	}
+	if( protocolo == TCP){
+		//como siempre los informes van hacia el servidor, sumamos el paquete.
+		pqtTxInfCam2Serv++
+		mapaEnviosCamaraInforme[packet->GetUid] = Simulator::Now();
 	}
 
 }
 
+/*void Observador::ServidorTx (Ptr<const Packet> packet) {
+	NS_LOG_FUNCTION("Transmision por parte del servidor");
+}*/
 
-void Observador::Rx(Ptr<const Packet > packet){
-	NS_LOG_FUNCTION("Paquete recibido");
+void Observador::UsuarioRx(Ptr<const Packet > packet){
+	NS_LOG_FUNCTION("Paquete recibido por el servidor con uid" << packet->GetUid());
+
+	//Como el usuario solo recibe video, sera siempre udp.
+	//calculamos el retardo.
+	double retardo = (Simulator::Now() - mapaEnviosCamaraVideo[packet->GetUid()]).GetMicroSeconds();
+	//actualizamos el retardo medio
+	retardoVideoUsuario.Update(retardo);
+	//como al usuario solo le envia la camara el paquete recibido es de video desde la camara.
+	pqtRxVidCam2Usr++;
+
+	//calculamos la variacion del retardo maxima.
+	if(flagFirsDelayVidCam2Usr == true){
+		varRetMaxVidCam2Usr = 0;
+		retardoAntVidCam2Usr = retardo;
+		flagFirsDelayVidCam2Usr = false;
+	}else{
+		double variacion = abs(retardo - retardoAntVidCam2Usr);
+		if(variacion > varRetMaxVidCam2Usr)
+			varRetMaxVidCam2Usr = variacion;
+		//actualizamos el retardo anterior.
+		retardoAntVidCam2Usr = retardo;
+	}
+
+	//borramos el paqeute del mapa.
+	mapaEnviosCamaraVideo.erase(packet->GetUid());
+}
+
+void Observador::ServidorRx(Ptr<const Packet > packet){
+	NS_LOG_FUNCTION("Paquete recibido por el usuario");
 
 	//Hacemos una copia del paquete original para poder modificarlo.
 	Ptr<Packet> pqt = packet->Copy();
@@ -139,32 +111,59 @@ void Observador::Rx(Ptr<const Packet > packet){
 	pqt->PeekHeader (ppp);
 	pqt->RemoveHeader(ppp);
 	//Obtenemos la cabecera a nivel IP para analizar el origen
-
 	Ipv4Header ip;
 	pqt->PeekHeader(ip);
-
-	//Aniadimos un paquete Rx del origen para el analisis de paquetes perdidos.
-	m_contadorPqtRx;
-
 	//Miramos que protrocolo se usa para saber si se trata de trafico de streaming.
 	uint8_t protocolo = ip.GetProtocol();
 
-	if ( protocolo == UDP )
-	{
-		Time retardo = Simulator::Now() - mapaTiempos[packet->GetUid()];
-		NS_LOG_INFO("Retardo del paquete: " << retardo);
-		m_retardoMedio.Update(retardo.GetDouble());
+	if(protocolo == TCP){
+		//aumentamos la cuenta de paquetes recibidos
+		pqtRxInfCam2Serv++;
+		double retardo = (Simulator::Now() - mapaEnviosCamaraInforme[packet->GetUid()]).GetMicroSeconds();
+		retInfCam2Serv.Update(retardo);
+		//sacamos el paqeute del mapa.
+		mapaEnviosCamaraInforme.erase(packet->GetUid());
+	}
+	if(protocolo == UDP){
+		//aumentamos la cuenta de paquetes recibidos
+		pqtRxVidCam2Serv++;
+		double retardo = (Simulator::Now() - mapaEnviosCamaraVideo[packet->GetUid()]).GetMicroSeconds();
+		retVidCam2Serv.Update(retardo);
 
-		if ( flagFirstDelay){
-				m_primerRetardo = retardo;
-				flagFirstDelay = false;
+		//calculamos la variacion de retardo para el video.
+		if(flagFirsDelayVidCam2Serv == true){
+			varRetMaxVidCam2Serv = 0;
+			retardoAntVidCam2Serv = retardo;
+			flagFirsDelayVidCam2Serv = false;
 		}else{
-				m_segundoRetardo = retardo;
-				NS_LOG_INFO("Primer retardo: " << m_primerRetardo << " .Segundo retardo: " << m_segundoRetardoUdp);
-				NS_LOG_INFO("Variacion del retardo: " << abs((m_segundoRetardo-m_primerRetardo).GetDouble()) << "ns");
-				m_variacionRetardo.Update(abs((m_segundoRetardo-m_primerRetardo).GetDouble()));
-				m_primerRetardo = m_segundoRetardo;
-			}
+			double variacion = abs(retardo - retardoAntVidCam2Serv);
+			if(variacion > varRetMaxVidCam2Serv)
+				varRetMaxVidCam2Serv = variacion;
+			//actualizamos el retardo.
+			retardoAntVidCam2Serv = retardo;
 		}
+		//sacamos el paquete del mapa.
+		mapaEnviosCamaraVideo.erase(packet->GetUid());
+	}
+
 }
-*/
+
+void Observador::GetEstadisticos(double& p_varMaxRetVidCam2Usr, double& p_retMedVidCam2Usr, double& p_perdidasVidCam2Usr, double& p_varMaxRetVidCam2Serv, double& p_retMedVidCam2Serv, double& p_perdidasVidCam2Serv, double& p_retMedInfCam2Serv, double& p_perdidasInfCam2Serv){
+	NS_LOG_FUNCTION("Devolviendo parametros del modelo calculados");
+	p_varMaxRetVidCam2Usr = varRetMaxVidCam2Usr;
+	NS_LOG_INFO("Maxima variacion camara a usuario: " << p_varMaxRetVidCam2Usr);
+	p_retMedVidCam2Usr = retardoVideoUsuario.Mean();
+	NS_LOG_INFO("Retardo medio video camara a usuario: " << p_retMedVidCam2Usr);
+	p_perdidasVidCam2Usr = pqtRxVidCam2Usr / pqtTxVidCam2Usr;
+	NS_LOG_INFO("Porcentaje de paquetes perdidos video camara a usuario: " << p_perdidasVidCam2Usr);
+	p_varMaxRetVidCam2Serv = varRetMaxVidCam2Serv;
+	NS_LOG_INFO("Maxima variacion camara a servidor: " << p_varMaxRetVidCam2Serv);
+	p_retMedVidCam2Serv = retVidCam2Serv.Mean();
+	NS_LOG_INFO("Retardo medio video camara a servidor: " << p_retMedVidCam2Serv);
+	p_perdidasVidCam2Serv = pqtRxVidCam2Serv / pqtTxVidCam2Serv;
+	NS_LOG_INFO("Porcentaje de paquetes perdidos video camara a servidor: " << p_perdidasVidCam2Serv);
+	p_retMedInfCam2Serv = retInfCam2Serv.Mean();
+	NS_LOG_INFO("Retardo medio informes camara a servidor: " << p_retMedInfCam2Serv);
+	p_perdidasInfCam2Serv = pqtRxInfCam2Serv / pqtTxInfCam2Serv;
+	NS_LOG_INFO("Porcentaje de paquetes perdidos informes camara a servidor: " << p_perdidasInfCam2Serv);
+}

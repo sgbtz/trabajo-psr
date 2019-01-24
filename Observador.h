@@ -2,39 +2,21 @@
 #define OBSERVADOR_H
 
 // includes de la aplicación
-#include "ns3/header.h"
-#include "ns3/core-module.h"
-#include "ns3/object.h"
-#include "ns3/global-value.h"
-#include "ns3/csma-module.h"
-#include "ns3/internet-module.h"
-#include "ns3/applications-module.h"
-#include "ns3/point-to-point-net-device.h"
-#include "ns3/point-to-point-channel.h"
-#include "ns3/point-to-point-remote-channel.h"
-#include "ns3/point-to-point-helper.h"
-#include "ns3/random-variable-stream.h"
-#include "ns3/attribute.h"
-#include "ns3/onoff-application.h"
-#include "ns3/tag.h"
+#include <iostream>
+#include <fstream>
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
-#include "ns3/stats-module.h"
-#include "ns3/log.h"
-#include "ns3/abort.h"
-#include "ns3/queue-limits.h"
-#include "ns3/queue.h"
-#include "ns3/net-device-queue-interface.h"
-#include "ns3/uinteger.h"
-#include "ns3/pointer.h"
-#include "ns3/traffic-control-layer.h"
-#include "ns3/traffic-control-helper.h"
+#include "ns3/callback.h"
+#include "ns3/csma-module.h"
+#include "ns3/average.h"
+#include "ns3/net-device.h"
+#include "ns3/applications-module.h"
+#include "ns3/socket.h"
 #include "ns3/inet-socket-address.h"
+#include "ns3/point-to-point-net-device.h"
 #include "ns3/ppp-header.h"
-#include <ns3/gnuplot.h>
-#include <ns3/queue.h>
-#include <ostream>
-#include <map>
+#include "ns3/sequence-number.h"
+#include "ns3/tcp-header.h"
 
 using namespace ns3;
 
@@ -42,68 +24,55 @@ using namespace ns3;
 #define TCP 6
 #define UDP 17
 
-struct ParametrosObservador {
-
+typedef struct{
 	Ptr<PointToPointNetDevice> camara;
 	Ptr<PointToPointNetDevice> usuario;
 	Ptr<PointToPointNetDevice> servidor;
-	Ipv4Address ip_cliente;
-
-
-};
+	uint32_t maxIpServidor;
+}ParametrosObservador;
 
 class Observador : public Object {
 
 	public:
-	Observador (ParametrosObservador); // constructor
-
-	// funciones get
+		Observador (ParametrosObservador parametros); // constructor
+		void GetEstadisticos(double& p_varMaxRetVidCam2Usr, double& p_retMedVidCam2Usr, double& p_perdidasVidCam2Usr, double& p_varMaxRetVidCam2Serv, double& p_retMedVidCam2Serv, double& p_perdidasVidCam2Serv, double& p_retMedInfCam2Serv, double& p_perdidasInfCam2Serv);
 
 	private:
 
-/*
-	void Rx(Ptr<const Packet> packet);
-	void Tx(Ptr<const Packet> packet);
+		void UsuarioRx(Ptr<const Packet> packet);
+		void CamaraTx(Ptr<const Packet> packet);
+		void ServidorRx(Ptr<const Packet> packet);
+		//void ServidorTx(Ptr<const Packet> packet);
 
-	Ptr<PointToPointNetDevice> m_camara;
-	Ptr<PointToPointNetDevice> m_usuario;
+		Ptr<PointToPointNetDevice> m_camara;
+		Ptr<PointToPointNetDevice> m_usuario;
+		Ptr<PointToPointNetDevice> m_servidor;
 
-	uint32_t m_contadorPqtRx;
-	uint32_t m_contadorPqtTx;
+		//mapa para almacenar las transmisiones de las camaras.
+	 	std::map<uint32_t, Time> mapaEnviosCamaraVideo;
+		std::map<uint32_t, Time> mapaEnviosCamaraInforme;
 
-	Ipv4Address m_ipCliente;
+		uint32_t m_maxIpServidor;
 
-	//Variables para calcular los estadisticos
-	Average<double> m_retardoMedio;
-	Average<double> m_variacionRetardo;
+		//variables para calculos entre camara y usuario.
+		Average<double> retardoVideoUsuario;
+		double retardoAntVidCam2Usr;
+		double varRetMaxVidCam2Usr;
+		BooleanValue flagFirsDelayVidCam2Usr;
+		uint32_t pqtTxVidCam2Usr;
+		uint32_t pqtRxVidCam2Usr;
 
-	//Mapa para calcular el retardo del streaming
- 	std::map<uint32_t, Time> mapaTiempos;
-	//Primer retardo para calcular la variacion
-	Time m_primerRetardo;
-	//Segundo retardo para calcular la variacion
-	Time m_segundoRetardo;
-	BooleanValue flagFirstDelay;
-*/
+		//variables para trafico entre camara y servidor.
+		uint32_t pqtTxVidCam2Serv;
+		uint32_t pqtRxVidCam2Serv;
+		uint32_t pqtTxInfCam2Serv;
+		uint32_t pqtRxInfCam2Serv;
+		Average<double> retVidCam2Serv;
+		Average<double> retInfCam2Serv;
+		double retardoAntVidCam2Serv;
+		double varRetMaxVidCam2Serv;
+		BooleanValue flagFirsDelayVidCam2Serv;
 
-	// variables parámetro
-	Ptr<Application> m_camara;
-	Ptr<Application> m_usuario;
-	Ptr<Application> m_servidor;
 
-	Ipv4Address m_ipCamara;
-	Ipv4Address m_ipUsuario;
-
-	// variables estadísticas Streaming Camara -> Servidor
-	uint64_t StreamingServidor_CuentaTx;
-	uint64_t StreamingServidor_CuentaRx;
-	Average<double> StreamingServidor_PorcentajeCorrectos;
-	Average<double> StreamingServidor_Retardo;
-
-	// variables estadísticas Streaming Camara -> Usuario
-	uint64_t StreamingUsuario_CuentaTx;
-	uint64_t StreamingUsuario_CuentaRx;
-	Average<double> StreamingUsuario_PorcentajeCorrectos;
-	Average<double> StreamingUsuario_Retardo;
 
 }
