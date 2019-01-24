@@ -11,10 +11,7 @@ Observador::Observador ( ParametrosObservador parametros ) {	// en el observador
 	 	m_usuario = parametros.usuario;
 		m_maxIpServidor = parametros.maxIpServidor;
 
-		m_contadorPqtVideoCamara2Servidor = 0;
-		m_contadorPqtInformeCamara2Servidor = 0;
-		m_contadorPqtVideoCamara2Usuario = 0;
-
+		//iniciamos los contadores de paqeutes.
 		pqtTxVidCam2Usr = 0;
 		pqtTxVidCam2Serv = 0;
 		pqtTxVidCam2Serv = 0;
@@ -52,7 +49,7 @@ void Observador::CamaraTx (Ptr<const Packet> packet) {
 	uint8_t protocolo = ip.GetProtocol();
 	if ( protocolo == UDP ){
 		mapaEnviosCamaraVideo[packet->GetUid()] = Simulator::Now();
-		if(ip.GetDestination().Get() >= maxIpServidor){
+		if(ip.GetDestination().Get() >= m_maxIpServidor){
 			pqtTxVidCam2Usr++;
 			NS_LOG_INFO("paquete enviado de camara a servidor");
 		}else{
@@ -62,8 +59,8 @@ void Observador::CamaraTx (Ptr<const Packet> packet) {
 	}
 	if( protocolo == TCP){
 		//como siempre los informes van hacia el servidor, sumamos el paquete.
-		pqtTxInfCam2Serv++
-		mapaEnviosCamaraInforme[packet->GetUid] = Simulator::Now();
+		pqtTxInfCam2Serv++;
+		mapaEnviosCamaraInforme[packet->GetUid()] = Simulator::Now();
 	}
 
 }
