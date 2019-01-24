@@ -17,6 +17,7 @@
 #include "ns3/ppp-header.h"
 #include "ns3/sequence-number.h"
 #include "ns3/tcp-header.h"
+#include "ns3/ipv4-header.h"
 
 using namespace ns3;
 
@@ -75,4 +76,6 @@ class Observador : public Object {
 
 
 
-}
+};
+
+#endif
