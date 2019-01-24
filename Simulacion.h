@@ -46,10 +46,10 @@ public:
   static TypeId GetTypeId (void);
 
   PrioPacketFilter ();
-  virtual ~PrioPacketFilter ();
+  ~PrioPacketFilter ();
 
 private:
-  virtual uint32_t DoClassify (Ptr<Ipv4QueueDiscItem> item) const;
+  int32_t DoClassify (Ptr<QueueDiscItem> item) const;
 
   uint32_t m_premiumMaxIp;
 };

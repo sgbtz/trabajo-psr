@@ -545,25 +545,27 @@ PrioPacketFilter::GetTypeId (void)
     .AddAttribute ("PremiumMaxIp",
                    "Mayor direccion IP.",
                    UintegerValue (0),
-                   MakeObjectVectorAccessor (&PrioPacketFilter::m_premiumMaxIp),
-                   MakeObjectVectorChecker<uint32_t> ())
+                   MakeUintegerAccessor (&PrioPacketFilter::m_premiumMaxIp),
+                   MakeUintegerChecker<uint32_t> ())
   ;
   return tid;
 }
 
 PrioPacketFilter::PrioPacketFilter ()
 {
+  NS_LOG_FUNCTION (this);
 }
 
 PrioPacketFilter::~PrioPacketFilter ()
 {
+  NS_LOG_FUNCTION (this);
 }
 
-uint32_t
-PrioPacketFilter::DoClassify (Ptr<Ipv4QueueDiscItem> item) const
+int32_t
+PrioPacketFilter::DoClassify (Ptr<QueueDiscItem> item) const
 {
   // Cola en la que se encolará el paquete
-  uint32_t cola = 0;
+  int32_t cola = 0;/*
   // Cabecera del paquete
   Ipv4Header header = item->GetHeader();
   //ip origen del paquete
@@ -571,7 +573,7 @@ PrioPacketFilter::DoClassify (Ptr<Ipv4QueueDiscItem> item) const
   uint32_t addr32bit = addr.Get();
   if (addr32bit < m_premiumMaxIp) { // si es premium
 
-  }
+  }ç*/
 
   return cola;
 }
