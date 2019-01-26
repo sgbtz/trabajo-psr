@@ -22,6 +22,7 @@
 #include "ns3/traffic-control-helper.h"
 #include "ns3/gnuplot.h"
 #include "Simulacion.h" // fichero de cabecera
+#include "Observador.h"
 
 using namespace ns3;
 NS_LOG_COMPONENT_DEFINE ("simulacion");
@@ -319,6 +320,26 @@ void escenario(ParamsEscenario paramsEscenario){
     devicesGrupo4[n_nodo] = enlaceUsuarios.Install(grupoCuatro[n_nodo]);
   }
 
+  /** Configuración de la prioridad en las colas **/
+  TrafficControlHelper trafficControl;
+  // Creamos una cola de prioridad con el mapa de prioridad dado
+  uint16_t handle = trafficControl.SetRootQueueDisc ("ns3::PrioQueueDisc", "Priomap", StringValue ("0 1 2 3 0 1 2 3 0 1 2 3 0 1 2 3"));
+  // Añadimos dos clases de cola
+  TrafficControlHelper::ClassIdList classIds = trafficControl.AddQueueDiscClasses (handle, 4, "ns3::QueueDiscClass");
+  // Adjuntamos dos colas FIFO para las dos clases añadidas
+  trafficControl.AddChildQueueDisc (handle, classIds[0], "ns3::FifoQueueDisc"); // para el video de premium
+  trafficControl.AddChildQueueDisc (handle, classIds[1], "ns3::FifoQueueDisc"); // para el video de no premium
+  trafficControl.AddChildQueueDisc (handle, classIds[2], "ns3::FifoQueueDisc"); // para el informe de premium
+  trafficControl.AddChildQueueDisc (handle, classIds[3], "ns3::FifoQueueDisc"); // para el informe de no premium
+  ////////////////////////////////////////////////////////////
+
+  // Instalamos el controlador de tráfico en cada router
+  NetDeviceContainer routerDevices;
+  routerDevices.Add(devicesGrupo2[G1_G3].Get(0));
+  routerDevices.Add(devicesGrupo2[G1_G3].Get(1));
+  routerDevices.Add(devicesGrupo2[G1_G4].Get(1));
+  trafficControl.Install(routerDevices);
+
   /** Configuración IP **/
   // Instalamos la pila TCP/IP en todos los nodos finales
   InternetStackHelper stack;
@@ -395,6 +416,10 @@ void escenario(ParamsEscenario paramsEscenario){
         premiumMaxIp = ipv4Address.Get();
     }
   }
+
+  // Añadimos un filtro de paquetes para encolar por prioridad
+  trafficControl.AddPacketFilter (handle, "ns3::PrioPacketFilter", "PremiumMaxIp", UintegerValue(premiumMaxIp));
+
   NS_LOG_INFO("Maxima direccion premium: " << premiumMaxIp);
   // Poblamos las tablas de rutas
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
@@ -417,28 +442,6 @@ void escenario(ParamsEscenario paramsEscenario){
     }
   }
 
-
-  NS_LOG_INFO("Hola caracola 1");
-  /** Configuración de la prioridad en las colas **/
-  TrafficControlHelper trafficControl;
-  // Creamos una cola de prioridad con el mapa de prioridad dado
-  uint16_t handle = trafficControl.SetRootQueueDisc ("ns3::PrioQueueDisc", "Priomap", StringValue ("0 1 2 3 0 1 2 3 0 1 2 3 0 1 2 3"));
-  // Añadimos dos clases de cola
-  TrafficControlHelper::ClassIdList classIds = trafficControl.AddQueueDiscClasses (handle, 4, "ns3::QueueDiscClass");
-  // Adjuntamos dos colas FIFO para las dos clases añadidas
-  trafficControl.AddChildQueueDisc (handle, classIds[0], "ns3::FifoQueueDisc"); // para el video de premium
-  trafficControl.AddChildQueueDisc (handle, classIds[1], "ns3::FifoQueueDisc"); // para el video de no premium
-  trafficControl.AddChildQueueDisc (handle, classIds[2], "ns3::FifoQueueDisc"); // para el informe de premium
-  trafficControl.AddChildQueueDisc (handle, classIds[3], "ns3::FifoQueueDisc"); // para el informe de no premium
-  // Añadimos un filtro de paquetes para encolar por prioridad
-  trafficControl.AddPacketFilter (handle, "ns3::PrioPacketFilter", "PremiumMaxIp", UintegerValue(premiumMaxIp));
-  NS_LOG_INFO("Hola caracola 2");
-  // Instalamos el controlador de tráfico en cada router
-  NetDeviceContainer routerDevices;
-  routerDevices.Add(devicesGrupo2[G1_G3].Get(0));
-  routerDevices.Add(devicesGrupo2[G1_G3].Get(1));
-  routerDevices.Add(devicesGrupo2[G1_G4].Get(1));
-  trafficControl.Install(routerDevices);
   /*__________________________________________**
   ** Creacion de aplicaciones y configuracion **
   **------------------------------------------**/
@@ -457,7 +460,7 @@ void escenario(ParamsEscenario paramsEscenario){
     receptorInformeServidor[n_server] = receptorInformeHelper.Install(grupoUno[n_server].Get(NODO_FINAL));
     receptorInformeServidor[n_server].Start(paramsEscenario.tstart);
   }
-   NS_LOG_INFO("Hola caracola 3");
+
   // instalamos los sumideros en los usuarios.
   ApplicationContainer receptorVideoUsuario[paramsEscenario.numUsers];
   ApplicationContainer receptorInformeUsuario[paramsEscenario.numUsers];
@@ -467,7 +470,7 @@ void escenario(ParamsEscenario paramsEscenario){
     receptorInformeUsuario[n_user] = receptorInformeHelper.Install(grupoCuatro[n_user].Get(NODO_FINAL));
     receptorInformeUsuario[n_user].Start(paramsEscenario.tstart);
   }
-  NS_LOG_INFO("Hola caracola 4");
+
 
   /*emisores de video hacia los usuarios desde los servidores. Tendremos un container por app
   ApplicationContainer appVideoServidor2Usuarios[paramsEscenario.numUsers];*/
@@ -476,6 +479,9 @@ void escenario(ParamsEscenario paramsEscenario){
   ApplicationContainer appInformeServer2User[paramsEscenario.numUsers]; // envío de informe del servidor al usuario
   ApplicationContainer appAlarmVideoCam2Server[paramsEscenario.numUsers]; // streaming de vídeo por alarma al servidor
   ApplicationContainer appAlarmVideoCam2User[paramsEscenario.numUsers]; // streaming de vídeo por alarma al usuario
+
+  //Array qe contiene el numero de servidor al que esta conectado el usuario indice de la tabla.
+  uint32_t connServUser[paramsEscenario.numUsers];
 
   // configuramos e instalamos las aplicaciones en las camaras y los servidores, las camaras y usuarios respectivos estaran
   // conectadas al mismo servidor, ademas, para simular el streaming se iniciaran a la VEZ <----- Esto se va a cambiar ???
@@ -489,7 +495,7 @@ void escenario(ParamsEscenario paramsEscenario){
     Ptr<UniformRandomVariable> momentoEnvioInforme = CreateObject<UniformRandomVariable>();
     Ptr<ExponentialRandomVariable> informeSize = CreateObject<ExponentialRandomVariable>();
     informeSize->SetAttribute("Mean", DoubleValue(paramsEscenario.infoReport.tamMedioInforme));
-  NS_LOG_INFO("Hola caracola 5");
+
     // obtenemos y guardamos los valores de incio de las alarmas y su duracion.
     Time inicioAlarma (alarmStart->GetValue(paramsEscenario.alarmVideo.minStartVideo.GetDouble(), paramsEscenario.alarmVideo.maxStartVideo.GetDouble()));
     Time duracionAlarma (alarmTime->GetValue());
@@ -497,17 +503,18 @@ void escenario(ParamsEscenario paramsEscenario){
     double tamInformes = informeSize->GetValue();
     // los informes se solicitan tras el final de la alarma
     Time inicioTxInforme (inicioAlarma.GetDouble() + duracionAlarma.GetDouble());
-  NS_LOG_INFO("Hola caracola 6");
+
     // para simular que los usuarios estan repartidos entre los servidores usaremos una variable aleatoria que determinara el servidor al que se conecta el usuario.
     Ptr<UniformRandomVariable> conectarCon = CreateObject<UniformRandomVariable>();
     uint32_t conServer = (uint32_t) conectarCon->GetValue(0, paramsEscenario.numServers-1); //tanto la camara como la aplicacion del usuario conectaran con el mismo servidor, determinado por esta variable.
-
+    //guardamos el servidor al que se ha conectado el usuario.
+    connServUser[n_nodo] = conServer;
     // creamos los helpers para las emisiones de contenido.
     UdpClientHelper emisorAlarmVideoCam2User = UdpClientHelper(Address (InetSocketAddress (interfacesGrupo4[n_nodo].GetAddress(NODO_FINAL), videoPort)));
     UdpClientHelper emisorAlarmVideoCam2Server = UdpClientHelper(Address (InetSocketAddress (interfacesGrupo1[conServer].GetAddress(NODO_FINAL), videoPort)));
     // BulkSendHelper emisorInformeServer2User = BulkSendHelper("ns3::TcpSocketFactory", Address (InetSocketAddress (interfacesGrupo4[n_nodo].GetAddress(NODO_FINAL), informePort)));
     BulkSendHelper emisorInformeCam2Server = BulkSendHelper("ns3::TcpSocketFactory", Address (InetSocketAddress (interfacesGrupo1[conServer].GetAddress(NODO_FINAL), informePort)));
-  NS_LOG_INFO("Hola caracola 7");
+
     // configuramos con las v.a. el emisor de video en streaming cuando hay alarma.
     emisorAlarmVideoCam2User.SetAttribute("StartTime", TimeValue(inicioAlarma));
     emisorAlarmVideoCam2User.SetAttribute("StopTime", TimeValue(inicioAlarma + duracionAlarma));
@@ -519,27 +526,53 @@ void escenario(ParamsEscenario paramsEscenario){
     emisorInformeServer2User.SetAttribute("SendSize", UintegerValue(tamInformes));*/
     emisorInformeCam2Server.SetAttribute("StartTime", TimeValue(inicioTxInforme));
     emisorInformeCam2Server.SetAttribute("SendSize", UintegerValue(tamInformes));
-  NS_LOG_INFO("Hola caracola 8");
+
     // realizamos las instalaciones.
     appAlarmVideoCam2Server[n_nodo] = emisorAlarmVideoCam2Server.Install(grupoTres[n_nodo]);
     appAlarmVideoCam2User[n_nodo] = emisorAlarmVideoCam2User.Install(grupoTres[n_nodo]);
     appInformeCam2Server[n_nodo] = emisorInformeCam2Server.Install(grupoTres[n_nodo]);
     // appInformeServer2User[n_nodo] = emisorInformeServer2User.Install(grupoUno[conServer]);
   }
-  NS_LOG_INFO("Hola caracola 9");
-  /** Creación de observadores **/
-/*
-  Observador obsPremium[paramsEscenario.numPremium];
-  Observador obsNoPremium[paramsEscenario.numUsers - paramsEscenario.numPremium];
-*/
 
-  //paramos la simulacion en el tstop ya que los eventos simulados pueden haberse configurado tras las 3h analizadas
+  /** Creación de observadores **/
+  //observadores para los usuarios premium.
+  Observador * obsPremium[paramsEscenario.numPremium];
+  for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numPremium; n_nodo++){
+    ParametrosObservador params;
+    params.camara = devicesGrupo3[n_nodo].Get(NODO_FINAL)->GetObject<PointToPointNetDevice>();
+    params.usuario = devicesGrupo4[n_nodo].Get(NODO_FINAL)->GetObject<PointToPointNetDevice>();
+    params.servidor = devicesGrupo1[connServUser[n_nodo]].Get(NODO_FINAL)->GetObject<PointToPointNetDevice>();
+    params.maxIpServidor = premiumMaxIp;
+    obsPremium[n_nodo] = new Observador(params);
+  }
+  //observadores para los usuarios no premium.
+  Observador * obsNoPremium[paramsEscenario.numUsers - paramsEscenario.numPremium];
+  for(uint32_t n_nodo = paramsEscenario.numPremium; n_nodo < paramsEscenario.numUsers; n_nodo++){
+    ParametrosObservador params;
+    params.camara = devicesGrupo3[n_nodo].Get(NODO_FINAL)->GetObject<PointToPointNetDevice>();
+    params.usuario = devicesGrupo4[n_nodo].Get(NODO_FINAL)->GetObject<PointToPointNetDevice>();
+    params.servidor = devicesGrupo1[connServUser[n_nodo]].Get(NODO_FINAL)->GetObject<PointToPointNetDevice>();
+    params.maxIpServidor = premiumMaxIp;
+    obsNoPremium[n_nodo] = new Observador(params);
+  }
+
+  //paramos la simulacion en el tstop ya que los eventos simulados pueden haberse configurado tras las 3h analizadas,
+  //puesto que hemos adaptado la probabilidad de que salte una alarma.
   Simulator::Stop(paramsEscenario.tstop);
   Simulator::Run();
 
-  NS_LOG_INFO("Hola caracola 10");
+  NS_LOG_DEBUG(obsNoPremium[0]);
+  NS_LOG_DEBUG(obsPremium[0]);
+
   Simulator::Destroy();
 
+  //destruimos los objetos observadores.
+  for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numPremium; n_nodo++){
+    delete obsPremium[n_nodo];
+  }
+  for(uint32_t n_nodo = paramsEscenario.numPremium; n_nodo < paramsEscenario.numUsers; n_nodo++){
+    delete obsNoPremium[n_nodo];
+  }
 
 }
 
@@ -610,4 +643,3 @@ PrioPacketFilter::DoClassify (Ptr<QueueDiscItem> item) const
 
   return cola;
 }
-//La simulacion hay que pararla manualmente.
