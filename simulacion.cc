@@ -71,17 +71,17 @@ NS_LOG_COMPONENT_DEFINE ("simulacion");
 #define MAX_START_VIDEO     "7h" // 3 alarms por semana -> 3/7 = 0.42 -> 1 alarm cada 3h/0.42=7h
 #define MEAN_DRTN_VIDEO     "15min"
 
-// parámetros del envío de informes
-#define TAM_MEDIO_INFO      1200
+// parámetros del envío de informes en bits
+#define TAM_MEDIO_INFO      200000000
 
 // definiciones generales
-#define NUM_USUARIOS        3 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
+#define NUM_USUARIOS        3000 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
 #define NUM_SERVIDORES      4
-#define NUM_PREMIUM         0
+#define NUM_PREMIUM         2500
 #define ENLACES_TRONCALES   2
 #define NUM_NODOS_ENLACE    2 //numero de nodos por enlace
 #define T_START             "0s"
-#define T_STOP              "3s"
+#define T_STOP              "50s"
 // indices para la tablas
 #define G1_G3       0
 #define G1_G4       1
@@ -320,26 +320,6 @@ void escenario(ParamsEscenario paramsEscenario){
     devicesGrupo4[n_nodo] = enlaceUsuarios.Install(grupoCuatro[n_nodo]);
   }
 
-  /** Configuración de la prioridad en las colas **/
-  TrafficControlHelper trafficControl;
-  // Creamos una cola de prioridad con el mapa de prioridad dado
-  uint16_t handle = trafficControl.SetRootQueueDisc ("ns3::PrioQueueDisc", "Priomap", StringValue ("0 1 2 3 0 1 2 3 0 1 2 3 0 1 2 3"));
-  // Añadimos dos clases de cola
-  TrafficControlHelper::ClassIdList classIds = trafficControl.AddQueueDiscClasses (handle, 4, "ns3::QueueDiscClass");
-  // Adjuntamos dos colas FIFO para las dos clases añadidas
-  trafficControl.AddChildQueueDisc (handle, classIds[0], "ns3::FifoQueueDisc"); // para el video de premium
-  trafficControl.AddChildQueueDisc (handle, classIds[1], "ns3::FifoQueueDisc"); // para el video de no premium
-  trafficControl.AddChildQueueDisc (handle, classIds[2], "ns3::FifoQueueDisc"); // para el informe de premium
-  trafficControl.AddChildQueueDisc (handle, classIds[3], "ns3::FifoQueueDisc"); // para el informe de no premium
-  ////////////////////////////////////////////////////////////
-
-  // Instalamos el controlador de tráfico en cada router
-  NetDeviceContainer routerDevices;
-  routerDevices.Add(devicesGrupo2[G1_G3].Get(0));
-  routerDevices.Add(devicesGrupo2[G1_G3].Get(1));
-  routerDevices.Add(devicesGrupo2[G1_G4].Get(1));
-  trafficControl.Install(routerDevices);
-
   /** Configuración IP **/
   // Instalamos la pila TCP/IP en todos los nodos finales
   InternetStackHelper stack;
@@ -417,8 +397,28 @@ void escenario(ParamsEscenario paramsEscenario){
     }
   }
 
+  /** Configuración de la prioridad en las colas **/
+  TrafficControlHelper trafficControl;
+  // Creamos una cola de prioridad con el mapa de prioridad dado
+  uint16_t handle = trafficControl.SetRootQueueDisc ("ns3::PrioQueueDisc", "Priomap", StringValue ("0 1 2 3 0 1 2 3 0 1 2 3 0 1 2 3"));
+  // Añadimos dos clases de cola
+  TrafficControlHelper::ClassIdList classIds = trafficControl.AddQueueDiscClasses (handle, 4, "ns3::QueueDiscClass");
+  // Adjuntamos dos colas FIFO para las dos clases añadidas
+  trafficControl.AddChildQueueDisc (handle, classIds[0], "ns3::FifoQueueDisc"); // para el video de premium
+  trafficControl.AddChildQueueDisc (handle, classIds[1], "ns3::FifoQueueDisc"); // para el video de no premium
+  trafficControl.AddChildQueueDisc (handle, classIds[2], "ns3::FifoQueueDisc"); // para el informe de premium
+  trafficControl.AddChildQueueDisc (handle, classIds[3], "ns3::FifoQueueDisc"); // para el informe de no premium
+
+  // Instalamos el controlador de tráfico en cada router
+  NetDeviceContainer routerDevices;
+  routerDevices.Add(devicesGrupo2[G1_G3].Get(0));
+  routerDevices.Add(devicesGrupo2[G1_G3].Get(1));
+  routerDevices.Add(devicesGrupo2[G1_G4].Get(1));
+  trafficControl.Uninstall(routerDevices);
+  trafficControl.Install(routerDevices);
   // Añadimos un filtro de paquetes para encolar por prioridad
   trafficControl.AddPacketFilter (handle, "ns3::PrioPacketFilter", "PremiumMaxIp", UintegerValue(premiumMaxIp));
+  ////FIN CONFIGURACION COLAS////
 
   NS_LOG_INFO("Maxima direccion premium: " << premiumMaxIp);
   // Poblamos las tablas de rutas
@@ -500,7 +500,8 @@ void escenario(ParamsEscenario paramsEscenario){
     Time inicioAlarma (alarmStart->GetValue(paramsEscenario.alarmVideo.minStartVideo.GetDouble(), paramsEscenario.alarmVideo.maxStartVideo.GetDouble()));
     Time duracionAlarma (alarmTime->GetValue());
     // guardamos los valores de incio de transmision y de tamano de los informe
-    double tamInformes = informeSize->GetValue();
+    uint64_t tamInformes = (uint64_t) informeSize->GetValue();
+    NS_LOG_DEBUG("tamano de los informes: " << tamInformes);
     // los informes se solicitan tras el final de la alarma
     Time inicioTxInforme (inicioAlarma.GetDouble() + duracionAlarma.GetDouble());
 
@@ -526,6 +527,8 @@ void escenario(ParamsEscenario paramsEscenario){
     emisorInformeServer2User.SetAttribute("SendSize", UintegerValue(tamInformes));*/
     emisorInformeCam2Server.SetAttribute("StartTime", TimeValue(inicioTxInforme));
     emisorInformeCam2Server.SetAttribute("SendSize", UintegerValue(tamInformes));
+    emisorInformeCam2Server.SetAttribute("MaxBytes", UintegerValue(tamInformes));
+    
 
     // realizamos las instalaciones.
     appAlarmVideoCam2Server[n_nodo] = emisorAlarmVideoCam2Server.Install(grupoTres[n_nodo]);
@@ -553,7 +556,7 @@ void escenario(ParamsEscenario paramsEscenario){
     params.usuario = devicesGrupo4[n_nodo].Get(NODO_FINAL)->GetObject<PointToPointNetDevice>();
     params.servidor = devicesGrupo1[connServUser[n_nodo]].Get(NODO_FINAL)->GetObject<PointToPointNetDevice>();
     params.maxIpServidor = premiumMaxIp;
-    obsNoPremium[n_nodo] = new Observador(params);
+    obsNoPremium[n_nodo - paramsEscenario.numPremium] = new Observador(params);
   }
 
   //paramos la simulacion en el tstop ya que los eventos simulados pueden haberse configurado tras las 3h analizadas,
@@ -561,8 +564,22 @@ void escenario(ParamsEscenario paramsEscenario){
   Simulator::Stop(paramsEscenario.tstop);
   Simulator::Run();
 
-  NS_LOG_DEBUG(obsNoPremium[0]);
-  NS_LOG_DEBUG(obsPremium[0]);
+  NS_LOG_DEBUG("observador premium cero: " << obsNoPremium[0]);
+  NS_LOG_DEBUG("observador no premium cero: " << obsPremium[0]);
+  double varMaxRetVidCam2Usr;
+  double retMedVidCam2Usr;
+  double perdidasVidCam2Usr;
+  double varMaxRetVidCam2Serv;
+  double retMedVidCam2Serv;
+  double perdidasVidCam2Serv;
+  double retMedInfCam2Serv;
+  double perdidasInfCam2Serv;
+  for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numPremium; n_nodo++){
+    obsPremium[n_nodo]->GetEstadisticos(varMaxRetVidCam2Usr,retMedVidCam2Usr,perdidasVidCam2Usr,varMaxRetVidCam2Serv,retMedVidCam2Serv,perdidasVidCam2Serv,retMedInfCam2Serv,perdidasInfCam2Serv);
+  }
+//IMPORTANTE:  para los calculos medios de los observadores y las graficas hay
+//que tener en cuenta que cuando la alarma no salta los valores son 0, por tanto
+//si son 0 no deben anadirse a las medias.
 
   Simulator::Destroy();
 
@@ -570,7 +587,7 @@ void escenario(ParamsEscenario paramsEscenario){
   for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numPremium; n_nodo++){
     delete obsPremium[n_nodo];
   }
-  for(uint32_t n_nodo = paramsEscenario.numPremium; n_nodo < paramsEscenario.numUsers; n_nodo++){
+  for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numUsers - paramsEscenario.numPremium; n_nodo++){
     delete obsNoPremium[n_nodo];
   }
 
