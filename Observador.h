@@ -36,7 +36,7 @@ class Observador : public Object {
 
 	public:
 		Observador (ParametrosObservador parametros); // constructor
-		void GetEstadisticos(double& p_varMaxRetVidCam2Usr, double& p_retMedVidCam2Usr, double& p_perdidasVidCam2Usr, double& p_varMaxRetVidCam2Serv, double& p_retMedVidCam2Serv, double& p_perdidasVidCam2Serv, double& p_retMedInfCam2Serv, double& p_perdidasInfCam2Serv);
+		void GetEstadisticos(Average<double> * p_varMaxRetVidCam2Usr, Average<double> * p_retMedVidCam2Usr, Average<double> * p_perdidasVidCam2Usr, Average<double> * p_varMaxRetVidCam2Serv, Average<double> * p_retMedVidCam2Serv, Average<double> * p_perdidasVidCam2Serv, Average<double> * p_retMedInfCam2Serv, Average<double> * p_perdidasInfCam2Serv);
 
 	private:
 

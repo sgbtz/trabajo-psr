@@ -145,40 +145,30 @@ void Observador::ServidorRx(Ptr<const Packet > packet){
 
 }
 
-void Observador::GetEstadisticos(double& p_varMaxRetVidCam2Usr, double& p_retMedVidCam2Usr, double& p_perdidasVidCam2Usr, double& p_varMaxRetVidCam2Serv, double& p_retMedVidCam2Serv, double& p_perdidasVidCam2Serv, double& p_retMedInfCam2Serv, double& p_perdidasInfCam2Serv){
+void Observador::GetEstadisticos(Average<double> * p_varMaxRetVidCam2Usr, Average<double> * p_retMedVidCam2Usr, Average<double> * p_perdidasVidCam2Usr, Average<double> * p_varMaxRetVidCam2Serv, Average<double> * p_retMedVidCam2Serv, Average<double> * p_perdidasVidCam2Serv, Average<double> * p_retMedInfCam2Serv, Average<double> * p_perdidasInfCam2Serv){
 	NS_LOG_FUNCTION("Devolviendo parametros del modelo calculados");
 
-	//como no podemos garantizar que una alarma haya saltado iniciaremos los valores a 0;
-	p_varMaxRetVidCam2Usr = 0;
-  p_retMedVidCam2Usr = 0;
-  p_perdidasVidCam2Usr = 0;
-  p_varMaxRetVidCam2Serv = 0;
-  p_retMedVidCam2Serv = 0;
-  p_perdidasVidCam2Serv = 0;
-  p_retMedInfCam2Serv = 0;
-  p_perdidasInfCam2Serv = 0;
-
 	if(varRetMaxVidCam2Usr != 0)
-		p_varMaxRetVidCam2Usr = varRetMaxVidCam2Usr;
+		p_varMaxRetVidCam2Usr->Update(varRetMaxVidCam2Usr);
 	NS_LOG_INFO("Maxima variacion camara a usuario: " << p_varMaxRetVidCam2Usr);
 	if(retardoVideoUsuario.Count() != 0)
-		p_retMedVidCam2Usr = retardoVideoUsuario.Mean();
+		p_retMedVidCam2Usr->Update(retardoVideoUsuario.Max());
 	NS_LOG_INFO("Retardo medio video camara a usuario: " << p_retMedVidCam2Usr);
 	if(pqtTxVidCam2Usr != 0)
-		p_perdidasVidCam2Usr = pqtRxVidCam2Usr / pqtTxVidCam2Usr;
+		p_perdidasVidCam2Usr->Update((1 - (pqtRxVidCam2Usr / pqtTxVidCam2Usr)) * 100);
 	NS_LOG_INFO("Porcentaje de paquetes perdidos video camara a usuario: " << p_perdidasVidCam2Usr);
-	p_varMaxRetVidCam2Serv = varRetMaxVidCam2Serv;
+	p_varMaxRetVidCam2Serv->Update(varRetMaxVidCam2Serv);
 	NS_LOG_INFO("Maxima variacion camara a servidor: " << p_varMaxRetVidCam2Serv);
 	if(retVidCam2Serv.Count() != 0)
-		p_retMedVidCam2Serv = retVidCam2Serv.Mean();
+		p_retMedVidCam2Serv->Update(retVidCam2Serv.Max());
 	NS_LOG_INFO("Retardo medio video camara a servidor: " << p_retMedVidCam2Serv);
 	if(pqtTxVidCam2Serv != 0)
-		p_perdidasVidCam2Serv = pqtRxVidCam2Serv / pqtTxVidCam2Serv;
+		p_perdidasVidCam2Serv->Update((1- (pqtRxVidCam2Serv / pqtTxVidCam2Serv)) * 100);
 	NS_LOG_INFO("Porcentaje de paquetes perdidos video camara a servidor: " << p_perdidasVidCam2Serv);
 	if(retInfCam2Serv.Count() != 0)
-	p_retMedInfCam2Serv = retInfCam2Serv.Mean();
+	p_retMedInfCam2Serv->Update(retInfCam2Serv.Max());
 	NS_LOG_INFO("Retardo medio informes camara a servidor: " << p_retMedInfCam2Serv);
 	if(pqtTxInfCam2Serv != 0)
-		p_perdidasInfCam2Serv = pqtRxInfCam2Serv / pqtTxInfCam2Serv;
+		p_perdidasInfCam2Serv->Update((1- (pqtRxInfCam2Serv / pqtTxInfCam2Serv)) * 100);
 	NS_LOG_INFO("Porcentaje de paquetes perdidos informes camara a servidor: " << p_perdidasInfCam2Serv);
 }

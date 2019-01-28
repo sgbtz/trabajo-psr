@@ -68,25 +68,31 @@ NS_LOG_COMPONENT_DEFINE ("simulacion");
 
 // parámetros de la transmisión de video
 #define MIN_START_VIDEO     "0s"
-#define MAX_START_VIDEO     "7h" // 3 alarms por semana -> 3/7 = 0.42 -> 1 alarm cada 3h/0.42=7h
+#define MAX_START_VIDEO     "50s" // 3 alarms por semana -> 3/7 = 0.42 -> 1 alarm cada 3h/0.42=7h
 #define MEAN_DRTN_VIDEO     "15min"
 
 // parámetros del envío de informes en bits
 #define TAM_MEDIO_INFO      200000000
 
 // definiciones generales
-#define NUM_USUARIOS        3000 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
+#define NUM_USUARIOS        300 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
 #define NUM_SERVIDORES      4
 #define NUM_PREMIUM         2500
 #define ENLACES_TRONCALES   2
 #define NUM_NODOS_ENLACE    2 //numero de nodos por enlace
 #define T_START             "0s"
-#define T_STOP              "50s"
+#define T_STOP              "1s"
 // indices para la tablas
 #define G1_G3       0
 #define G1_G4       1
 #define ROUTER      0
 #define NODO_FINAL  1
+
+// índices para las tablas de curvas
+#define CAM_SERV_PREMIUM  0
+#define CAM_SERV_BESTEFF  1
+#define CAM_USER_PREMIUM  2
+#define CAM_USER_BESTEFF  3
 
 //definimos los identificadores de protocolo de TCP y UDP
 #define PROTOCOLO_TCP 6
@@ -127,6 +133,15 @@ typedef struct {
   Time tstop;             // fin simulación
 } ParamsEscenario;
 
+// Estructura para los resultados de la simulación
+typedef struct {
+  Average<double> varMaxVideo[4];
+  Average<double> retMaxVideo[4];
+  Average<double> porPerVideo[4];
+  Average<double> retMaxInfo[2];
+  Average<double> porPerInfo[2];
+} ResultSimulacion;
+
 
 /************ Definición de funciones *************/
 /*
@@ -138,7 +153,7 @@ typedef struct {
 **
 */
 
-void escenario(ParamsEscenario paramsEscenario);
+void escenario(ParamsEscenario paramsEscenario, ResultSimulacion * resultados);
 
 int main (int argc, char *argv[]) {
   NS_LOG_FUNCTION("Función main: configuración de los parámetros y generación de gráficas");
@@ -242,14 +257,222 @@ int main (int argc, char *argv[]) {
   paramsEscenario.tstart = tstart;
   paramsEscenario.tstop = tstop;
 
+  /** Generación de gráficas **/
+  // Gráfica para la variación máxima de retardo en vídeo en función del ratio clientes/servidores
+  Gnuplot graficaVarVideoRatio;
+  graficaVarVideoRatio.SetLegend ("Ratio clientes/servidores", "Variación retardo máxima (ms)");
+  graficaVarVideoRatio.SetTitle ("Variación máxima de retardo en vídeo en función del ratio clientes/servidores");
+  // Gráfica para el retardo máximo en vídeo en función del ratio clientes/servidores
+  Gnuplot graficaRetVideoRatio;
+  graficaRetVideoRatio.SetLegend ("Ratio clientes/servidores", "Retardo máximo (ms)");
+  graficaRetVideoRatio.SetTitle ("Retardo máximo en vídeo en función del ratio clientes/servidores");
+  // Gráfica para el % de paquetes perdidos en vídeo en función del ratio clientes/servidores
+  Gnuplot graficaPerVideoRatio;
+  graficaPerVideoRatio.SetLegend ("Ratio clientes/servidores", "Paquetes perdidos (%)");
+  graficaPerVideoRatio.SetTitle ("Paquetes perdidos en vídeo en función del ratio clientes/servidores");
+  // Gráfica para el retardo máximo en informes en función del ratio clientes/servidores
+  Gnuplot graficaRetInfoRatio;
+  graficaRetInfoRatio.SetLegend ("Ratio clientes/servidores", "Retardo máximo (ms)");
+  graficaRetInfoRatio.SetTitle ("Retardo máximo en informes en función del ratio clientes/servidores");
+  // Gráfica para el % de paquetes perdidos en informes en función del ratio clientes/servidores
+  Gnuplot graficaPerInfoRatio;
+  graficaPerInfoRatio.SetLegend ("Ratio clientes/servidores", "Paquetes perdidos (%)");
+  graficaPerInfoRatio.SetTitle ("Porcentaje de paquetes perdidos en informes en función del ratio clientes/servidores");
 
-  escenario(paramsEscenario);
+  // Gráfica para la variación máxima de retardo en función de la capacidad de los enlaces entre routers
+  Gnuplot graficaVarVideoCap;
+  graficaVarVideoCap.SetLegend ("Capacidad enlaces routers (MB/s)", "Variación retardo máxima (ms)");
+  graficaVarVideoCap.SetTitle ("Variación máxima de retardo en función de la capacidad de los enlaces entre routers");
+  // Gráfica para el retardo máximo en función de la capacidad de los enlaces entre routers
+  Gnuplot graficaRetVideoCap;
+  graficaRetVideoCap.SetLegend ("Capacidad enlaces routers (MB/s)", "Retardo máximo (ms)");
+  graficaRetVideoCap.SetTitle ("Retardo máximo en función de la capacidad de los enlaces entre routers");
+  // Gráfica para el % de paquetes perdidos en función de la capacidad de los enlaces entre routers
+  Gnuplot graficaPerVideoCap;
+  graficaPerVideoCap.SetLegend ("Capacidad enlaces routers (MB/s)", "Paquetes perdidos (%)");
+  graficaPerVideoCap.SetTitle ("Porcentaje de paquetes perdidos en función de la capacidad de los enlaces entre routers");
+  // Gráfica para el retardo máximo en informes en función de la capacidad de los enlaces entre routers
+  Gnuplot graficaRetInfoCap;
+  graficaRetInfoCap.SetLegend ("Capacidad enlaces routers (MB/s)", "Retardo máximo (ms)");
+  graficaRetInfoCap.SetTitle ("Retardo máximo en informes en función de la capacidad de los enlaces entre routers");
+  // Gráfica para el % de paquetes perdidos en informes en función de la capacidad de los enlaces entre routers
+  Gnuplot graficaPerInfoCap;
+  graficaPerInfoCap.SetLegend ("Capacidad enlaces routers (MB/s)", "Paquetes perdidos (%)");
+  graficaPerInfoCap.SetTitle ("Porcentaje de paquetes perdidos en informes en función de la capacidad de los enlaces entre routers");
+
+  /** Simulación **/
+  // Necesitaremos 4 curvas para cada gráfica del vídeo
+  Gnuplot2dDataset * curvasVarVideoRatio[4];
+  curvasVarVideoRatio[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasVarVideoRatio[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  curvasVarVideoRatio[CAM_USER_PREMIUM] = new Gnuplot2dDataset ("Camara -> Usuario Premium");
+  curvasVarVideoRatio[CAM_USER_BESTEFF] = new Gnuplot2dDataset ("Camara -> Usuario Best-Effort");
+  Gnuplot2dDataset * curvasRetVideoRatio[4];
+  curvasRetVideoRatio[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasRetVideoRatio[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  curvasRetVideoRatio[CAM_USER_PREMIUM] = new Gnuplot2dDataset ("Camara -> Usuario Premium");
+  curvasRetVideoRatio[CAM_USER_BESTEFF] = new Gnuplot2dDataset ("Camara -> Usuario Best-Effort");
+  Gnuplot2dDataset * curvasPerVideoRatio[4];
+  curvasPerVideoRatio[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasPerVideoRatio[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  curvasPerVideoRatio[CAM_USER_PREMIUM] = new Gnuplot2dDataset ("Camara -> Usuario Premium");
+  curvasPerVideoRatio[CAM_USER_BESTEFF] = new Gnuplot2dDataset ("Camara -> Usuario Best-Effort");
+  Gnuplot2dDataset * curvasVarVideoCap[4];
+  curvasVarVideoCap[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasVarVideoCap[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  curvasVarVideoCap[CAM_USER_PREMIUM] = new Gnuplot2dDataset ("Camara -> Usuario Premium");
+  curvasVarVideoCap[CAM_USER_BESTEFF] = new Gnuplot2dDataset ("Camara -> Usuario Best-Effort");
+  Gnuplot2dDataset * curvasRetVideoCap[4];
+  curvasRetVideoCap[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasRetVideoCap[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  curvasRetVideoCap[CAM_USER_PREMIUM] = new Gnuplot2dDataset ("Camara -> Usuario Premium");
+  curvasRetVideoCap[CAM_USER_BESTEFF] = new Gnuplot2dDataset ("Camara -> Usuario Best-Effort");
+  Gnuplot2dDataset * curvasPerVideoCap[4];
+  curvasPerVideoCap[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasPerVideoCap[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  curvasPerVideoCap[CAM_USER_PREMIUM] = new Gnuplot2dDataset ("Camara -> Usuario Premium");
+  curvasPerVideoCap[CAM_USER_BESTEFF] = new Gnuplot2dDataset ("Camara -> Usuario Best-Effort");
+
+  for (uint8_t curva = 0 ; curva < 4 ; curva++) {
+    curvasVarVideoRatio[curva]->SetStyle (Gnuplot2dDataset::LINES);
+    curvasRetVideoRatio[curva]->SetStyle (Gnuplot2dDataset::LINES);
+    curvasPerVideoRatio[curva]->SetStyle (Gnuplot2dDataset::LINES);
+    curvasVarVideoCap[curva]->SetStyle (Gnuplot2dDataset::LINES);
+    curvasRetVideoCap[curva]->SetStyle (Gnuplot2dDataset::LINES);
+    curvasPerVideoCap[curva]->SetStyle (Gnuplot2dDataset::LINES);
+  }
+
+  // y 2 para cada gráfica del informe
+  Gnuplot2dDataset * curvasRetInfoRatio[2];
+  curvasRetInfoRatio[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasRetInfoRatio[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  Gnuplot2dDataset * curvasPerInfoRatio[2];
+  curvasPerInfoRatio[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasPerInfoRatio[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  Gnuplot2dDataset * curvasRetInfoCap[2];
+  curvasRetInfoCap[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasRetInfoCap[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+  Gnuplot2dDataset * curvasPerInfoCap[2];
+  curvasPerInfoCap[CAM_SERV_PREMIUM] = new Gnuplot2dDataset ("Camara -> Servidor Premium");
+  curvasPerInfoCap[CAM_SERV_BESTEFF] = new Gnuplot2dDataset ("Camara -> Servidor Best-Effort");
+
+  for (uint8_t curva = 0 ; curva < 2 ; curva++) {
+    curvasRetInfoRatio[curva]->SetStyle (Gnuplot2dDataset::LINES);
+    curvasPerInfoRatio[curva]->SetStyle (Gnuplot2dDataset::LINES);
+    curvasRetInfoCap[curva]->SetStyle (Gnuplot2dDataset::LINES);
+    curvasPerInfoCap[curva]->SetStyle (Gnuplot2dDataset::LINES);
+  }
+
+  // Realizamos 10 simulaciones variando el ratio clientes/servidores
+  for (uint32_t clientes = numUsers ; clientes < numUsers*10 ; clientes += numUsers ) {
+    // Aumentamos también el número de usuarios premium para mantener la proporción
+    // Actualizamos los parámetros de la simulación
+    paramsEscenario.numUsers = clientes;
+    paramsEscenario.numPremium += numPremium;
+
+    ResultSimulacion resultados;
+    // Se realiza una sola muestra (falta calcular TSTUDENT y hacer varias/10)
+    escenario(paramsEscenario, &resultados);
+
+    // Añadimos los resultados a las curvas
+    for (uint8_t curva = 0 ; curva < 4 ; curva++) {
+      curvasVarVideoRatio[curva]->Add(clientes/numServers, resultados.varMaxVideo[curva].Max(), 0);
+      curvasRetVideoRatio[curva]->Add(clientes/numServers, resultados.retMaxVideo[curva].Max(), 0);
+      curvasPerVideoRatio[curva]->Add(clientes/numServers, resultados.porPerVideo[curva].Max(), 0);
+    }
+    for (uint8_t curva = 0 ; curva < 2 ; curva++) {
+      curvasRetInfoRatio[curva]->Add(clientes/numServers, resultados.retMaxInfo[curva].Max(), 0);
+      curvasPerInfoRatio[curva]->Add(clientes/numServers, resultados.porPerVideo[curva].Max(), 0);
+    }
+  }
+
+  // Realizamos 10 simulaciones variando la capacidad de los enlaces entre routers
+  paramsEscenario.numUsers = numUsers;
+  paramsEscenario.numPremium = numPremium;
+  for (uint64_t bitRate = routerRate.GetBitRate() ; bitRate < routerRate.GetBitRate()*10 ; bitRate += routerRate.GetBitRate() ) {
+    // Actualizamos los parámetros de la simulación
+    DataRate capEnlaces (bitRate);
+    paramsEscenario.routerLink.rate = capEnlaces;
+
+    ResultSimulacion resultados;
+    // Se realiza una sola muestra (falta calcular TSTUDENT y hacer varias/10)
+    escenario(paramsEscenario, &resultados);
+
+    // Añadimos los resultados a las curvas
+    for (uint8_t curva = 0 ; curva < 4 ; curva++) {
+      curvasVarVideoCap[curva]->Add(capEnlaces.GetBitRate()/(8*1000), resultados.varMaxVideo[curva].Max(), 0);
+      curvasRetVideoCap[curva]->Add(capEnlaces.GetBitRate()/(8*1000), resultados.retMaxVideo[curva].Max(), 0);
+      curvasPerVideoCap[curva]->Add(capEnlaces.GetBitRate()/(8*1000), resultados.porPerVideo[curva].Max(), 0);
+    }
+    for (uint8_t curva = 0 ; curva < 2 ; curva++) {
+      curvasRetInfoCap[curva]->Add(capEnlaces.GetBitRate()/(8*1000), resultados.retMaxInfo[curva].Max(), 0);
+      curvasPerInfoCap[curva]->Add(capEnlaces.GetBitRate()/(8*1000), resultados.porPerVideo[curva].Max(), 0);
+    }
+  }
+  // Añadimos las curvas a las gráficas
+  for (uint8_t curva = 0 ; curva < 4 ; curva++) {
+    graficaVarVideoRatio.AddDataset (*curvasVarVideoRatio[curva]);
+    graficaRetVideoRatio.AddDataset (*curvasRetVideoRatio[curva]);
+    graficaPerVideoRatio.AddDataset (*curvasPerVideoRatio[curva]);
+    graficaVarVideoCap.AddDataset (*curvasVarVideoCap[curva]);
+    graficaRetVideoCap.AddDataset (*curvasRetVideoCap[curva]);
+    graficaPerVideoCap.AddDataset (*curvasPerVideoCap[curva]);
+  }
+  for (uint8_t curva = 0 ; curva < 2 ; curva++) {
+    graficaRetInfoRatio.AddDataset (*curvasRetInfoRatio[curva]);
+    graficaPerInfoRatio.AddDataset (*curvasPerInfoRatio[curva]);
+    graficaRetInfoCap.AddDataset (*curvasRetInfoCap[curva]);
+    graficaPerInfoCap.AddDataset (*curvasPerInfoCap[curva]);
+  }
+
+  // Por último generamos los ficheros
+  std::ofstream fich_varVideoRatio ("var-video-ratio.plt");
+  graficaVarVideoRatio.GenerateOutput (fich_varVideoRatio);
+  fich_varVideoRatio << "pause -1" << std::endl;
+  fich_varVideoRatio.close ();
+  std::ofstream fich_retVideoRatio ("ret-video-ratio.plt");
+  graficaRetVideoRatio.GenerateOutput (fich_retVideoRatio);
+  fich_retVideoRatio << "pause -1" << std::endl;
+  fich_retVideoRatio.close ();
+  std::ofstream fich_perVideoRatio ("per-video-ratio.plt");
+  graficaPerVideoRatio.GenerateOutput (fich_perVideoRatio);
+  fich_perVideoRatio << "pause -1" << std::endl;
+  fich_perVideoRatio.close ();
+  std::ofstream fich_varVideoCap ("var-video-cap.plt");
+  graficaVarVideoCap.GenerateOutput (fich_varVideoCap);
+  fich_varVideoCap << "pause -1" << std::endl;
+  fich_varVideoCap.close ();
+  std::ofstream fich_retVideoCap ("ret-video-cap.plt");
+  graficaRetVideoCap.GenerateOutput (fich_retVideoCap);
+  fich_retVideoCap << "pause -1" << std::endl;
+  fich_retVideoCap.close ();
+  std::ofstream fich_perVideoCap ("per-video-cap.plt");
+  graficaPerVideoCap.GenerateOutput (fich_perVideoCap);
+  fich_perVideoCap << "pause -1" << std::endl;
+  fich_perVideoCap.close ();
+
+  std::ofstream fich_retInfoRatio ("ret-info-ratio.plt");
+  graficaRetInfoRatio.GenerateOutput (fich_retInfoRatio);
+  fich_retInfoRatio << "pause -1" << std::endl;
+  fich_retInfoRatio.close ();
+  std::ofstream fich_perInfoRatio ("per-info-ratio.plt");
+  graficaPerInfoRatio.GenerateOutput (fich_perInfoRatio);
+  fich_perInfoRatio << "pause -1" << std::endl;
+  fich_perInfoRatio.close ();
+  std::ofstream fich_retInfoCap ("ret-info-cap.plt");
+  graficaRetInfoCap.GenerateOutput (fich_retInfoCap);
+  fich_retInfoCap << "pause -1" << std::endl;
+  fich_retInfoCap.close ();
+  std::ofstream fich_perInfoCap ("per-info-cap.plt");
+  graficaPerInfoCap.GenerateOutput (fich_perInfoCap);
+  fich_perInfoCap << "pause -1" << std::endl;
+  fich_perInfoCap.close ();
 
   return 0;
 }
 
 
-void escenario(ParamsEscenario paramsEscenario){
+void escenario(ParamsEscenario paramsEscenario, ResultSimulacion * resultados){
   NS_LOG_FUNCTION("Funcion escenario: configuracion basica de un escenario y simulacion");
 
   /** Configuración del escenario **/
@@ -408,6 +631,8 @@ void escenario(ParamsEscenario paramsEscenario){
   trafficControl.AddChildQueueDisc (handle, classIds[1], "ns3::FifoQueueDisc"); // para el video de no premium
   trafficControl.AddChildQueueDisc (handle, classIds[2], "ns3::FifoQueueDisc"); // para el informe de premium
   trafficControl.AddChildQueueDisc (handle, classIds[3], "ns3::FifoQueueDisc"); // para el informe de no premium
+  // Añadimos un filtro de paquetes para encolar por prioridad
+  trafficControl.AddPacketFilter (handle, "ns3::PrioPacketFilter", "PremiumMaxIp", UintegerValue(premiumMaxIp));
 
   // Instalamos el controlador de tráfico en cada router
   NetDeviceContainer routerDevices;
@@ -416,8 +641,7 @@ void escenario(ParamsEscenario paramsEscenario){
   routerDevices.Add(devicesGrupo2[G1_G4].Get(1));
   trafficControl.Uninstall(routerDevices);
   trafficControl.Install(routerDevices);
-  // Añadimos un filtro de paquetes para encolar por prioridad
-  trafficControl.AddPacketFilter (handle, "ns3::PrioPacketFilter", "PremiumMaxIp", UintegerValue(premiumMaxIp));
+
   ////FIN CONFIGURACION COLAS////
 
   NS_LOG_INFO("Maxima direccion premium: " << premiumMaxIp);
@@ -528,7 +752,7 @@ void escenario(ParamsEscenario paramsEscenario){
     emisorInformeCam2Server.SetAttribute("StartTime", TimeValue(inicioTxInforme));
     emisorInformeCam2Server.SetAttribute("SendSize", UintegerValue(tamInformes));
     emisorInformeCam2Server.SetAttribute("MaxBytes", UintegerValue(tamInformes));
-    
+
 
     // realizamos las instalaciones.
     appAlarmVideoCam2Server[n_nodo] = emisorAlarmVideoCam2Server.Install(grupoTres[n_nodo]);
@@ -566,20 +790,23 @@ void escenario(ParamsEscenario paramsEscenario){
 
   NS_LOG_DEBUG("observador premium cero: " << obsNoPremium[0]);
   NS_LOG_DEBUG("observador no premium cero: " << obsPremium[0]);
-  double varMaxRetVidCam2Usr;
-  double retMedVidCam2Usr;
-  double perdidasVidCam2Usr;
-  double varMaxRetVidCam2Serv;
-  double retMedVidCam2Serv;
-  double perdidasVidCam2Serv;
-  double retMedInfCam2Serv;
-  double perdidasInfCam2Serv;
+  Average<double> varMaxRetVidCam2Usr;
+  Average<double> retMedVidCam2Usr;
+  Average<double> perdidasVidCam2Usr;
+  Average<double> varMaxRetVidCam2Serv;
+  Average<double> retMedVidCam2Serv;
+  Average<double> perdidasVidCam2Serv;
+  Average<double> retMedInfCam2Serv;
+  Average<double> perdidasInfCam2Serv;
   for(uint32_t n_nodo = 0; n_nodo < paramsEscenario.numPremium; n_nodo++){
-    obsPremium[n_nodo]->GetEstadisticos(varMaxRetVidCam2Usr,retMedVidCam2Usr,perdidasVidCam2Usr,varMaxRetVidCam2Serv,retMedVidCam2Serv,perdidasVidCam2Serv,retMedInfCam2Serv,perdidasInfCam2Serv);
+    obsPremium[n_nodo]->GetEstadisticos(&varMaxRetVidCam2Usr, &retMedVidCam2Usr, &perdidasVidCam2Usr, &varMaxRetVidCam2Serv, &retMedVidCam2Serv, &perdidasVidCam2Serv, &retMedInfCam2Serv, &perdidasInfCam2Serv);
   }
-//IMPORTANTE:  para los calculos medios de los observadores y las graficas hay
-//que tener en cuenta que cuando la alarma no salta los valores son 0, por tanto
-//si son 0 no deben anadirse a las medias.
+
+  // Falta añadir a los resultados los valores máximos de cada estádistico
+  // Hay que diferenciar entre premium y no premium !!!!!!!!!!!!
+  //IMPORTANTE:  para los calculos medios de los observadores y las graficas hay
+  //que tener en cuenta que cuando la alarma no salta los valores son 0, por tanto
+  //si son 0 no deben anadirse a las medias.
 
   Simulator::Destroy();
 
