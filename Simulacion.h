@@ -1,3 +1,18 @@
+/*************** TRABAJO PSR ***************/
+/*
+**  Simulacion de una empresa de camaras de vigilancia.
+**  Fichero de cabecera del archivo principal.
+**  Apellidos, Nombres:
+**
+**    - Cabrera Miñagorri, Miguel Ángel
+**    - García Ferrer, Pablo
+**    - Guisasola Benítez, Sebastiá
+**    - Jiménez Olmedo, Fº Javier
+**    - Montero Ramírez, Ezequiel
+**
+**  Grupo 2
+*/
+
 #ifndef SIMULACION_H
 #define SIMULACION_H
 

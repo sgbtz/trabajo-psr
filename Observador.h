@@ -1,3 +1,18 @@
+/*************** TRABAJO PSR ***************/
+/*
+**  Simulacion de una empresa de camaras de vigilancia.
+** 	Fichero de cabecera de observacion de nodos.
+**  Apellidos, Nombres:
+**
+**    - Cabrera Miñagorri, Miguel Ángel
+**    - García Ferrer, Pablo
+**    - Guisasola Benítez, Sebastiá
+**    - Jiménez Olmedo, Fº Javier
+**    - Montero Ramírez, Ezequiel
+**
+**  Grupo 2
+*/
+
 #ifndef OBSERVADOR_H
 #define OBSERVADOR_H
 
@@ -30,6 +45,7 @@ typedef struct{
 	Ptr<PointToPointNetDevice> usuario;
 	Ptr<PointToPointNetDevice> servidor;
 	uint32_t maxIpServidor;
+	Ipv4Address ip;
 }ParametrosObservador;
 
 class Observador : public Object {
@@ -48,6 +64,7 @@ class Observador : public Object {
 		Ptr<PointToPointNetDevice> m_camara;
 		Ptr<PointToPointNetDevice> m_usuario;
 		Ptr<PointToPointNetDevice> m_servidor;
+		Ipv4Address m_camaraIp;
 
 		//mapa para almacenar las transmisiones de las camaras.
 	 	std::map<uint32_t, Time> mapaEnviosCamaraVideo;
@@ -60,14 +77,14 @@ class Observador : public Object {
 		double retardoAntVidCam2Usr;
 		double varRetMaxVidCam2Usr;
 		BooleanValue flagFirsDelayVidCam2Usr;
-		uint32_t pqtTxVidCam2Usr;
-		uint32_t pqtRxVidCam2Usr;
+		double pqtTxVidCam2Usr;
+		double pqtRxVidCam2Usr;
 
 		//variables para trafico entre camara y servidor.
-		uint32_t pqtTxVidCam2Serv;
-		uint32_t pqtRxVidCam2Serv;
-		uint32_t pqtTxInfCam2Serv;
-		uint32_t pqtRxInfCam2Serv;
+		double pqtTxVidCam2Serv;
+		double pqtRxVidCam2Serv;
+		double pqtTxInfCam2Serv;
+		double pqtRxInfCam2Serv;
 		Average<double> retVidCam2Serv;
 		Average<double> retInfCam2Serv;
 		double retardoAntVidCam2Serv;
