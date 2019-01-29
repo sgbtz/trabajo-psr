@@ -68,21 +68,21 @@ NS_LOG_COMPONENT_DEFINE ("simulacion");
 
 // parámetros de la transmisión de video
 #define MIN_START_VIDEO     "0s"
-#define MAX_START_VIDEO     "2.38h" // 3 alarms por semana -> 3/7 = 0.42 -> 1 alarm cada 1h/0.42=2.38h
-#define MEAN_DRTN_VIDEO     "15min" //15min de media.
+#define MAX_START_VIDEO     "1.19min" // 3 alarms por semana -> 3/7 = 0.42 -> 1 alarm cada 1h/0.42=2.38h
+#define MEAN_DRTN_VIDEO     "7.5s" //15min de media.
 #define INTERVALO_VIDEO     "10ms"
 
 // parámetros del envío de informes en bits
 #define TAM_MEDIO_INFO      2000000
 
 // definiciones generales
-#define NUM_USUARIOS        300 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
+#define NUM_USUARIOS        60 //el numero de usuarios representara tambien el numero de camaras 1 usuario -> 1 camara
 #define NUM_SERVIDORES      5
-#define NUM_PREMIUM         100
+#define NUM_PREMIUM         20
 #define ENLACES_TRONCALES   2
 #define NUM_NODOS_ENLACE    2 //numero de nodos por enlace
 #define T_START             "0s"
-#define T_STOP              "1h"
+#define T_STOP              "30s"
 // indices para la tablas
 #define G1_G3       0
 #define G1_G4       1
@@ -405,15 +405,15 @@ int main (int argc, char *argv[]) {
       double errorVar = TSTUDENT * sqrt (resultados.varMaxVideo[curva].Var () / resultados.varMaxVideo[curva].Count ());
       double errorRet = TSTUDENT * sqrt (resultados.retMaxVideo[curva].Var () / resultados.retMaxVideo[curva].Count ());
       double errorPer = TSTUDENT * sqrt (resultados.porPerVideo[curva].Var () / resultados.porPerVideo[curva].Count ());
-      curvasVarVideoRatio[curva].Add(double(clientes)/double(numServers), resultados.varMaxVideo[curva].Max(), errorVar);
-      curvasRetVideoRatio[curva].Add(double(clientes)/double(numServers), resultados.retMaxVideo[curva].Max(), errorRet);
-      curvasPerVideoRatio[curva].Add(double(clientes)/double(numServers), resultados.porPerVideo[curva].Max(), errorPer);
+      curvasVarVideoRatio[curva].Add(double(clientes)/double(numServers), resultados.varMaxVideo[curva].Mean(), errorVar);
+      curvasRetVideoRatio[curva].Add(double(clientes)/double(numServers), resultados.retMaxVideo[curva].Mean(), errorRet);
+      curvasPerVideoRatio[curva].Add(double(clientes)/double(numServers), resultados.porPerVideo[curva].Mean(), errorPer);
     }
     for (uint8_t curva = 0 ; curva < 2 ; curva++) {
       double errorRet = TSTUDENT * sqrt (resultados.retMaxInfo[curva].Var () / resultados.retMaxInfo[curva].Count ());
       double errorPer = TSTUDENT * sqrt (resultados.porPerInfo[curva].Var () / resultados.porPerInfo[curva].Count ());
-      curvasRetInfoRatio[curva].Add(double(clientes)/double(numServers), resultados.retMaxInfo[curva].Max(), errorRet);
-      curvasPerInfoRatio[curva].Add(double(clientes)/double(numServers), resultados.porPerInfo[curva].Max(), errorPer);
+      curvasRetInfoRatio[curva].Add(double(clientes)/double(numServers), resultados.retMaxInfo[curva].Mean(), errorRet);
+      curvasPerInfoRatio[curva].Add(double(clientes)/double(numServers), resultados.porPerInfo[curva].Mean(), errorPer);
     }
   }
 
@@ -438,15 +438,15 @@ int main (int argc, char *argv[]) {
       double errorVar = TSTUDENT * sqrt (resultados.varMaxVideo[curva].Var () / resultados.varMaxVideo[curva].Count ());
       double errorRet = TSTUDENT * sqrt (resultados.retMaxVideo[curva].Var () / resultados.retMaxVideo[curva].Count ());
       double errorPer = TSTUDENT * sqrt (resultados.porPerVideo[curva].Var () / resultados.porPerVideo[curva].Count ());
-      curvasVarVideoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.varMaxVideo[curva].Max(), errorVar);
-      curvasRetVideoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.retMaxVideo[curva].Max(), errorRet);
-      curvasPerVideoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.porPerVideo[curva].Max(), errorPer);
+      curvasVarVideoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.varMaxVideo[curva].Mean(), errorVar);
+      curvasRetVideoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.retMaxVideo[curva].Mean(), errorRet);
+      curvasPerVideoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.porPerVideo[curva].Mean(), errorPer);
     }
     for (uint8_t curva = 0 ; curva < 2 ; curva++) {
       double errorRet = TSTUDENT * sqrt (resultados.retMaxInfo[curva].Var () / resultados.retMaxInfo[curva].Count ());
       double errorPer = TSTUDENT * sqrt (resultados.porPerInfo[curva].Var () / resultados.porPerInfo[curva].Count ());
-      curvasRetInfoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.retMaxInfo[curva].Max(), errorRet);
-      curvasPerInfoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.porPerInfo[curva].Max(), errorPer);
+      curvasRetInfoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.retMaxInfo[curva].Mean(), errorRet);
+      curvasPerInfoCap[curva].Add(double(double(capEnlaces.GetBitRate())/double(8*1000)), resultados.porPerInfo[curva].Mean(), errorPer);
     }
   }
 
